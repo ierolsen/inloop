@@ -4,17 +4,25 @@
 export type Parameter = { name: string; meaning: string; default: string | null; why_this_value: string | null; doc_url: string | null }
 export type SymbolKind = 'class' | 'function' | 'method' | 'endpoint' | 'module' | 'type' | 'other'
 export type Symbol = { name: string; kind: SymbolKind; file: string | null; why_exists: string; why_this_shape: string | null; called_by: string | null }
+// Something the change brings in from another file or a library, and why
+export type Use = { name: string; from: string; why: string; doc_url: string | null }
+// A comment on one line of the new code, found again by a piece of that line's text
+export type LineNote = { anchor: string; says: string }
 
 export type Note = {
   title: string
+  tldr: string
   files: string[]
   what: string
   why: string
   basis: 'verified' | 'judgment' | null
+  uses: Use[]
   alternatives: string[]
   parameters: Parameter[]
   symbols: Symbol[]
+  lines: LineNote[]
   risks: string[]
+  commit: string | null // the commit a reconstructed note explains
 }
 
 export type Recap = {
@@ -56,10 +64,17 @@ export function cleanNote(input: Record<string, unknown>): { note: Note; problem
   const problems: string[] = []
   const note: Note = {
     title: str(input.title, 200),
+    tldr: str(input.tldr, 400),
     files: strings(input.files),
     what: str(input.what),
     why: str(input.why),
     basis: input.basis === 'verified' || input.basis === 'judgment' ? input.basis : null,
+    uses: arr(input.uses).map(obj).filter((u) => str(u.name)).map((u) => ({
+      name: str(u.name, 200),
+      from: str(u.from, 500),
+      why: str(u.why),
+      doc_url: url(u.doc_url),
+    })),
     alternatives: strings(input.alternatives),
     parameters: arr(input.parameters).map(obj).filter((p) => str(p.name)).map((p) => ({
       name: str(p.name, 200),
@@ -76,9 +91,11 @@ export function cleanNote(input: Record<string, unknown>): { note: Note; problem
       why_this_shape: opt(s.why_this_shape),
       called_by: opt(s.called_by),
     })),
+    lines: arr(input.lines).map(obj).filter((x) => str(x.anchor) && str(x.says)).map((x) => ({ anchor: str(x.anchor, 300), says: str(x.says) })),
     risks: strings(input.risks),
+    commit: /^[0-9a-f]{4,40}$/i.test(str(input.commit, 40)) ? str(input.commit, 40).toLowerCase() : null,
   }
-  for (const key of ['title', 'what', 'why'] as const) if (!note[key]) problems.push(key + ' is empty')
+  for (const key of ['title', 'tldr', 'what', 'why'] as const) if (!note[key]) problems.push(key + ' is empty')
   if (!note.files.length) problems.push('files is empty')
   return { note, problems }
 }

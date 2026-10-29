@@ -1,4 +1,5 @@
-// Settings: which language inloop's notes and page are in, and how much detail the notes carry.
+// Settings: which language inloop's notes and page are in, how much detail the notes carry, and
+// whether they are written in the ADHD-friendly form.
 // Plain module: no mods API calls here (see CLAUDE.md).
 
 export type Detail = 'brief' | 'standard' | 'deep'
@@ -15,6 +16,7 @@ export type Language = {
 export type Settings = {
   language: Language & { source: Source }
   detail: { value: Detail; source: Source }
+  adhd: { value: boolean; source: Source }
 }
 
 // Known languages: code, English name, native name, and other spellings people type.
@@ -73,6 +75,15 @@ export function language(input: string): Language | null {
   return { code: null, english: text, native: text }
 }
 
+// on/off, true/false, yes/no, 1/0, as typed or as stored
+export function adhd(input: unknown): boolean | null {
+  if (typeof input === 'boolean') return input
+  const text = typeof input === 'string' ? input.trim().toLowerCase() : ''
+  if (['on', 'true', 'yes', '1'].includes(text)) return true
+  if (['off', 'false', 'no', '0'].includes(text)) return false
+  return null
+}
+
 export function detail(input: unknown): Detail | null {
   const text = typeof input === 'string' ? input.trim().toLowerCase() : ''
   return (DETAILS as string[]).includes(text) ? (text as Detail) : null
@@ -92,7 +103,12 @@ export function resolve(layers: { project?: Record<string, unknown>; user?: Reco
     const value = layer ? detail(layer.detail) : null
     if (value) { level = { value, source }; break }
   }
-  return { language: lang, detail: level }
+  let easy: Settings['adhd'] = { value: false, source: 'default' }
+  for (const [source, layer] of order) {
+    const value = layer ? adhd(layer.adhd) : null
+    if (value !== null) { easy = { value, source }; break }
+  }
+  return { language: lang, detail: level, adhd: easy }
 }
 
 // How the language reads in the instructions: "Turkish (Türkçe)", or the name as given

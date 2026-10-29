@@ -1,9 +1,9 @@
 // inloop's hooks module: the only file that calls the mods API. Every other module under hooks/ is
 // plain code that takes values and returns values (see CLAUDE.md).
 
-import { resolve, language as parseLanguage, detail as parseDetail, languageName, type Settings } from './config.ts'
+import { resolve, language as parseLanguage, detail as parseDetail, adhd as parseAdhd, languageName, type Settings } from './config.ts'
 import { instructions, NOTE_SPEC, RECAP_SPEC } from './instructions.ts'
-import { cleanNote, cleanRecap, relative, inside, Pairing } from './note.ts'
+import { cleanNote, cleanRecap, relative, inside, sameFile, Pairing } from './note.ts'
 import { diff, isBinary } from './diff.ts'
 import { redact, redactDeep, sensitive } from './redact.ts'
 import { SCHEMA, DIR, LOG_DIR, REVIEW_DIR, CONFIG, PART_BYTES, line, parse, partPath, bytes, sessionsOf, type LogRecord, type OutsideEntry, type Skipped } from './log.ts'
@@ -21,6 +21,7 @@ const SECTION = PLUGIN + ':instructions'
 const READ_MAX = 1_000_000 // bytes of a file read for a diff; larger files are logged without one
 const DIFF_LINES = 400
 const SESSIONS_MAX = 20 // sessions on the list /inloop open all writes
+const COMMITS_MAX = 50 // commits recorded from one move of HEAD
 const PANE = 'inloop' // the pane's id
 const NOTHING_OUTSIDE = '[[],0]' // fingerprint() of an empty list: where every baseline starts
 
@@ -47,6 +48,10 @@ let turn: string | null = null
 let git = false
 let head: string | null = null
 let dirty = new Set<string>()
+let firstHead: string | null = null // HEAD when the session began: where its own commits start
+let knownHead: string | null = null // HEAD as last seen; a move means new commits
+let waiting: { id: string; path: string }[] = [] // edits not in a commit yet
+let waitingNotes: { id: string; files: string[] }[] = [] // live notes not in a commit yet
 let logged = new Set<string>() // files with an edit in this session's log
 let lastOutside = NOTHING_OUTSIDE
 let tally = { notes: 0, edits: 0, unexplained: 0, outside: 0 }
@@ -76,6 +81,10 @@ function reset() {
   git = false
   head = null
   dirty = new Set()
+  firstHead = null
+  knownHead = null
+  waiting = []
+  waitingNotes = []
   logged = new Set()
   lastOutside = NOTHING_OUTSIDE
   tally = { notes: 0, edits: 0, unexplained: 0, outside: 0 }
@@ -96,7 +105,8 @@ const now = () => Date.now()
 // the edit tools. Until one comes, the session's records stay in memory, so a session that only
 // talks leaves no .inloop/ folder behind.
 const recordsSomething = (r: LogRecord) =>
-  r.kind === 'note' || r.kind === 'edit' || r.kind === 'recap' || (r.kind === 'outside' && (r.entries.length > 0 || r.more > 0))
+  r.kind === 'note' || r.kind === 'edit' || r.kind === 'recap' || (r.kind === 'outside' && (r.entries.length > 0 || r.more > 0)) ||
+  (r.kind === 'commit' && (r.edits.length > 0 || r.notes.length > 0))
 
 // .inloop/ keeps itself out of git, so nothing inloop writes is committed by accident. Runs before
 // inloop first writes anything there.
@@ -151,7 +161,14 @@ async function loadLog($: any) {
     for (const r of parsed) {
       if (r.kind === 'note') tally.notes = Math.max(tally.notes, r.n)
       if (r.kind === 'edit' && r.status === 'ok') { tally.edits++; logged.add(r.path); if (!r.note) tally.unexplained++ }
-      if (r.kind === 'baseline') { git = r.git; head = r.head; dirty = new Set(r.dirty); tally.outside = 0; lastOutside = NOTHING_OUTSIDE }
+      if (r.kind === 'baseline') { git = r.git; head = r.head; dirty = new Set(r.dirty); tally.outside = 0; lastOutside = NOTHING_OUTSIDE; knownHead = r.head; if (firstHead === null) firstHead = r.head }
+      if (r.kind === 'edit' && r.status === 'ok') waiting.push({ id: r.id, path: r.path })
+      if (r.kind === 'note' && r.source === 'live') waitingNotes.push({ id: r.id, files: r.note.files })
+      if (r.kind === 'commit') {
+        knownHead = r.sha
+        waiting = waiting.filter((x) => !r.edits.includes(x.id))
+        waitingNotes = waitingNotes.filter((x) => !r.notes.includes(x.id))
+      }
       if (r.kind === 'switch') enabled = r.on
       if (r.kind === 'outside') { tally.outside = r.entries.length + r.more; lastOutside = fingerprint(r.entries, r.more) }
     }
@@ -183,11 +200,11 @@ async function readUser($: any): Promise<Record<string, unknown>> {
 
 async function loadSettings($: any) {
   settings = resolve({ project: await readProject($), user: await readUser($), plugin: options })
-  prompt = instructions(PLUGIN, settings.language, settings.detail.value)
+  prompt = instructions(PLUGIN, settings.language, settings.detail.value, settings.adhd.value)
 }
 
 // Sets (or, with null, removes) one setting for this project or across projects, then reloads them.
-async function setSetting($: any, key: 'language' | 'detail', value: string | null, project: boolean) {
+async function setSetting($: any, key: 'language' | 'detail' | 'adhd', value: string | null, project: boolean) {
   if (project) {
     const current = await readProject($)
     if (value === null && !(key in current)) return loadSettings($)
@@ -225,6 +242,8 @@ async function takeBaseline($: any) {
     const s = await gitRun($, ['git', 'status', '--porcelain=v1', '-z', '--untracked-files=all'])
     dirty = new Set(porcelain(s.out).filter((p) => p !== DIR && !p.startsWith(DIR + '/')))
   }
+  knownHead = head
+  if (firstHead === null) firstHead = head
   await append($, { v: SCHEMA, kind: 'baseline', ts: now(), session, agent: null, turn, git, head, dirty: [...dirty] })
   tally.outside = 0
   lastOutside = NOTHING_OUTSIDE
@@ -271,6 +290,29 @@ async function checkOutside($: any): Promise<boolean> {
   return paths.length > 0
 }
 
+// Records the commits made since HEAD was last seen, each with the edits and notes it took in:
+// an edit goes with the first commit that contains its file, a note without edits with the first
+// commit that contains a file it names. Amended or rebased commits are matched again on the page.
+async function checkHead($: any) {
+  if (!git) return
+  const h = await gitRun($, ['git', 'rev-parse', '--verify', '--quiet', 'HEAD'])
+  const current = h.ok ? h.out.trim() : ''
+  if (!current || current === knownHead) return
+  const range = knownHead ? knownHead + '..' + current : current
+  const shas = (await gitRun($, ['git', 'rev-list', '--reverse', '--max-count=' + COMMITS_MAX, range])).out.split('\n').filter(Boolean)
+  knownHead = current
+  for (const sha of shas) {
+    const [parents = '', subject = ''] = (await gitRun($, ['git', 'show', '-s', '--format=%P%x00%s', sha])).out.replace(/\n$/, '').split('\u0000')
+    const files = nul((await gitRun($, ['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', '-z', '--root', sha])).out)
+    const touched = new Set(files)
+    const edits = waiting.filter((x) => touched.has(x.path)).map((x) => x.id)
+    waiting = waiting.filter((x) => !touched.has(x.path))
+    const notes = waitingNotes.filter((n) => n.files.some((f) => files.some((c) => sameFile(f, c) || sameFile(c, f)))).map((n) => n.id)
+    waitingNotes = waitingNotes.filter((n) => !notes.includes(n.id))
+    await append($, { v: SCHEMA, kind: 'commit', ts: now(), session, agent: null, turn, sha, parents: parents.split(' ').filter(Boolean), subject, files, edits, notes })
+  }
+}
+
 // ---- edits ------------------------------------------------------------------------------------
 
 // The file as it is now, or why inloop does not read it.
@@ -308,6 +350,7 @@ async function recordEdit($: any, e: any, path: string, before: Snapshot, result
     tally.edits++
     turnTally.edits++
     logged.add(rel)
+    waiting.push({ id: String(e.tool_use_id ?? ''), path: rel })
     if (!match) { tally.unexplained++; turnTally.unexplained++ }
   }
   await append($, {
@@ -338,7 +381,7 @@ async function start($: any) {
   if (!continued) {
     await append($, {
       v: SCHEMA, kind: 'session', ts: now(), session, agent: null, turn: null, root,
-      language: languageName(settings.language), language_code: settings.language.code, detail: settings.detail.value, version: VERSION,
+      language: languageName(settings.language), language_code: settings.language.code, detail: settings.detail.value, adhd: settings.adhd.value, version: VERSION,
     })
   }
   await takeBaseline($)
@@ -494,6 +537,7 @@ function statusText(): string {
     state: enabled ? l.state_on : l.state_off,
     language: nameOf(settings.language, code), language_source: sourceName(l, settings.language.source),
     detail: detailName(l, settings.detail.value), detail_source: sourceName(l, settings.detail.source),
+    adhd: settings.adhd.value ? l.state_on : l.state_off, adhd_source: sourceName(l, settings.adhd.source),
     notes: count(code, l.notes, tally.notes), edits: count(code, l.edits, tally.edits),
     unexplained: tally.unexplained, files: count(code, l.files, tally.outside),
     log: partPath(root, session, part),
@@ -513,7 +557,7 @@ export function register(on: any, pluginOptions: any) {
       await $.command.register({
         name: PLUGIN,
         description: 'inloop: the review page, the pane, the language and detail of notes, on and off',
-        argumentHint: '[open | open all | pane | status | lang <language> | detail <level> | on | off | help]',
+        argumentHint: '[open | open all | pane | status | lang <language> | detail <level> | adhd on|off | on | off | help]',
         immediate: true,
       })
     } catch (err) {
@@ -558,7 +602,10 @@ export function register(on: any, pluginOptions: any) {
     const id = String(e.tool_use_id ?? 'note-' + tally.notes)
     const source = e.source === 'reconstructed' ? 'reconstructed' : 'live'
     // an explanation of code that already exists is not the reason for the next edit
-    if (source === 'live') pairing.addNote(agentOf(e) ?? 'main', id, clean.files.map((f) => relative(f, root)))
+    if (source === 'live') {
+      pairing.addNote(agentOf(e) ?? 'main', id, clean.files.map((f) => relative(f, root)))
+      waitingNotes.push({ id, files: clean.files.map((f) => relative(f, root)) })
+    }
     numbers.set(id, tally.notes)
     try {
       await append($, { v: SCHEMA, kind: 'note', ts: now(), session, agent: agentOf(e), turn, id, n: tally.notes, source, note: clean, problems })
@@ -636,11 +683,26 @@ export function register(on: any, pluginOptions: any) {
     return result
   }).catch(async ($: any, e: any, next: any) => next(e)) // if capture itself fails, the edit still runs (or keeps its result)
 
+  // Commits are made through the shell: after each command, a move of HEAD is recorded as the new
+  // commits. The command itself is never touched.
+  on('tool.call', { tool: ['Bash', 'PowerShell'] }, async ($: any, e: any, next: any) => {
+    const result = await next(e)
+    if (ready && enabled && git) {
+      try {
+        await checkHead($)
+      } catch {
+        // the end of the turn checks again
+      }
+    }
+    return result
+  }).catch(async ($: any, e: any, next: any) => next(e)) // replay-safe: a command that ran is not run again
+
   on('turn.complete', async ($: any, e: any, next: any) => {
     const result = await next(e)
     if (agentOf(e) || e.isAborted || !ready || !enabled) return result
     let outside = false
     try {
+      await checkHead($)
       outside = await checkOutside($)
     } catch {
       // the next turn checks again
@@ -708,6 +770,21 @@ export function register(on: any, pluginOptions: any) {
       await setSetting($, 'detail', level, project)
       const said = [say(project ? l.detail_project : l.detail_user, { detail: detailName(l, level) })]
       if (!project && settings.detail.source === 'project') said.push(say(l.detail_project_wins, { detail: detailName(l, settings.detail.value) }))
+      return { text: said.join('\n') }
+    }
+    if (command === 'adhd') {
+      if (value === 'reset') {
+        if (!project) await setSetting($, 'adhd', null, false)
+        await setSetting($, 'adhd', null, true)
+        const after = labels(settings.language.code)
+        return { text: say(after.adhd_reset, { state: settings.adhd.value ? after.state_on : after.state_off, source: sourceName(after, settings.adhd.source) }) }
+      }
+      const wanted = parseAdhd(value)
+      if (wanted === null) return { text: l.adhd_bad }
+      await setSetting($, 'adhd', wanted ? 'on' : 'off', project)
+      const after = labels(settings.language.code)
+      const said = [project ? (wanted ? after.adhd_on_project : after.adhd_off_project) : (wanted ? after.adhd_on_user : after.adhd_off_user)]
+      if (!project && settings.adhd.source === 'project') said.push(say(after.adhd_project_wins, { state: settings.adhd.value ? after.state_on : after.state_off }))
       return { text: said.join('\n') }
     }
     return { text: say(l.unknown, { command }) + '\n' + l.help }

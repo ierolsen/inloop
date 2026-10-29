@@ -10,7 +10,14 @@
   "homepage": "https://github.com/ierolsen/inloop",
   "repository": "https://github.com/ierolsen/inloop",
   "license": "MIT",
-  "keywords": ["code review", "explain", "agents", "learning", "mod", "i18n"],
+  "keywords": [
+    "code review",
+    "explain",
+    "agents",
+    "learning",
+    "mod",
+    "i18n"
+  ],
   "userConfig": {
     "language": {
       "type": "string",
@@ -21,9 +28,23 @@
     "detail": {
       "type": "string",
       "title": "Detail",
-      "description": "brief: what and why. standard: also the parameters that are not obvious, and why each new class or function exists. deep: also every parameter, with links to official documentation.",
-      "options": ["brief", "standard", "deep"],
+      "description": "How much the notes explain. brief: what and why. standard: also the parameters that are not obvious, comments on the lines a reader would stop at, and why each new class or function exists. deep: also every parameter, comments on most changed lines, and links to official documentation.",
+      "options": [
+        "brief",
+        "standard",
+        "deep"
+      ],
       "default": "standard"
+    },
+    "adhd": {
+      "type": "string",
+      "title": "ADHD-friendly notes",
+      "description": "on: notes put the point first, use short lines and bold key words, and explain every term, symbol and parameter in plain words with an example from the code. It changes how notes are written, not how much they explain.",
+      "options": [
+        "off",
+        "on"
+      ],
+      "default": "off"
     }
   }
 }

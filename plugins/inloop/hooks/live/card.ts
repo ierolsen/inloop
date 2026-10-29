@@ -25,10 +25,14 @@ export function noteCard(t: any, note: Note, n: number | null, reconstructed: bo
   if (note.basis === 'judgment') tags.push(l.page_basis_judgment)
   if (reconstructed) tags.push(l.page_reconstructed)
   const parts: any[] = [head(t, tags), t.Text({ bold: true, children: note.title })]
+  if (note.tldr) parts.push(t.Text({ color: 'cyan', children: note.tldr }))
   if (note.files.length) parts.push(t.Text({ dimColor: true, children: note.files.join(' · ') }))
   // while Claude still streams the call, fields arrive one by one: draw what has arrived
   if (note.what) parts.push(t.Markdown({ text: clip('**' + l.page_what + ':** ' + note.what) }))
   if (note.why) parts.push(t.Markdown({ text: clip('**' + l.page_why + ':** ' + note.why) }))
+  if (note.uses.length) {
+    parts.push(block(t, l.page_uses, list(note.uses.map((u) => code(u.name) + ' (' + u.from + '): ' + u.why))))
+  }
   if (note.symbols.length) {
     parts.push(block(t, l.page_symbols, list(note.symbols.map((s) => code(s.name) + ' (' + l[('page_kind_' + s.kind) as 'page_kind_class'] + '): ' + s.why_exists))))
   }

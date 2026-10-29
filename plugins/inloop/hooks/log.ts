@@ -16,7 +16,7 @@ type Base = { v: number; ts: number; session: string; agent: string | null; turn
 
 export type Skipped = 'binary' | 'too-large' | 'sensitive' | 'unreadable' | 'unchanged'
 
-export type SessionRecord = Base & { kind: 'session'; root: string; language: string; language_code: string | null; detail: string; version: string }
+export type SessionRecord = Base & { kind: 'session'; root: string; language: string; language_code: string | null; detail: string; adhd?: boolean; version: string }
 export type NoteRecord = Base & { kind: 'note'; id: string; n: number; source: 'live' | 'reconstructed'; note: Note; problems: string[] }
 export type RecapRecord = Base & { kind: 'recap'; id: string; recap: Recap }
 export type EditRecord = Base & {
@@ -39,9 +39,12 @@ export type BaselineRecord = Base & { kind: 'baseline'; git: boolean; head: stri
 export type OutsideEntry = { path: string; state: 'added' | 'modified' | 'deleted'; diff: string | null; added: number; removed: number; truncated: boolean; skipped: Skipped | null; redactions: number }
 export type OutsideRecord = Base & { kind: 'outside'; entries: OutsideEntry[]; more: number }
 
+// A commit made during the session (by Claude through a shell command, or by the person), with
+// the edits and notes that went into it
+export type CommitRecord = Base & { kind: 'commit'; sha: string; parents: string[]; subject: string; files: string[]; edits: string[]; notes: string[] }
 // /inloop on and off: the page shows when nothing was recorded, and a reload keeps the choice
 export type SwitchRecord = Base & { kind: 'switch'; on: boolean }
-export type LogRecord = SessionRecord | NoteRecord | RecapRecord | EditRecord | BaselineRecord | OutsideRecord | SwitchRecord
+export type LogRecord = SessionRecord | NoteRecord | RecapRecord | EditRecord | BaselineRecord | OutsideRecord | SwitchRecord | CommitRecord
 
 export function line(record: LogRecord): string {
   return JSON.stringify(record) + '\n'

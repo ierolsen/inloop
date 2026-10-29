@@ -25,6 +25,7 @@ export type World = {
   panes: Map<string, boolean> // open panes, and whether each found room
   room: boolean // whether a pane that opens finds room
   toasts: string[]
+  shell: ((command: string) => void) | null // what a Bash call does in this world, such as making a commit
   // the log of this session as inloop wrote it, line by line
   records: () => any[]
 }
@@ -43,6 +44,7 @@ export function worldOf(on: On, given: { files?: Record<string, string>; git?: G
     panes: new Map(),
     room: true,
     toasts: [],
+    shell: null,
     records: () => (world.files.get(LOG) ?? '').split('\n').filter(Boolean).map((l) => JSON.parse(l)),
   }
   const files = world.files
@@ -96,6 +98,10 @@ export function worldOf(on: On, given: { files?: Record<string, string>; git?: G
   on('turn.complete', ($: any, e: any) => ({ text: e.answer }))
   // the built-in edit tools, run against the files above
   on('tool.call', ($: any, e: any) => {
+    if (e.tool === 'Bash') {
+      world.shell?.(String(e.command))
+      return { result: { stdout: '', stderr: '', interrupted: false } }
+    }
     const path = String(e.file_path)
     if (world.refused.has(path)) return { deny: 'The user refused this edit.' }
     if (e.tool === 'Write') files.set(path, String(e.content))
@@ -111,4 +117,4 @@ export function worldOf(on: On, given: { files?: Record<string, string>; git?: G
 // The calls a test makes most, with the fields the engine always sends
 export const command = (args: string) => ({ command: 'inloop', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } }) as any
 export const turnDone = (turnId: string, more: Record<string, unknown> = {}) => ({ answer: 'Done.', durationMs: 5, isAborted: false, turnId, reason: 'answer', ...more }) as any
-export const note = (fields: Record<string, unknown>) => ({ tool: 'mcp__inloop__note', ...fields }) as any
+export const note = (fields: Record<string, unknown>) => ({ tool: 'mcp__inloop__note', tldr: 'The point.', ...fields }) as any

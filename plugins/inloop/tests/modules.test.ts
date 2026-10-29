@@ -21,7 +21,9 @@ test('a language is found by code, English name, native name or another spelling
 })
 
 test('settings come from the project, then the user, then the plugin, then the default', async () => {
-  expect(resolve({})).toEqual({ language: { code: 'en', english: 'English', native: 'English', source: 'default' }, detail: { value: 'standard', source: 'default' } })
+  expect(resolve({})).toEqual({ language: { code: 'en', english: 'English', native: 'English', source: 'default' }, detail: { value: 'standard', source: 'default' }, adhd: { value: false, source: 'default' } })
+  expect(resolve({ project: { adhd: 'on' }, user: { adhd: false } }).adhd).toEqual({ value: true, source: 'project' })
+  expect(resolve({ user: { adhd: false }, plugin: { adhd: 'on' } }).adhd).toEqual({ value: false, source: 'user' })
   const s = resolve({ project: { detail: 'deep' }, user: { language: 'tr', detail: 'brief' }, plugin: { language: 'German', detail: 'standard' } })
   expect(s.language.code).toBe('tr')
   expect(s.language.source).toBe('user')
@@ -46,7 +48,8 @@ test('the instructions name the language and the detail rule, and depend only on
 
 test('a note is cleaned: strings trimmed, lists coerced, bad URLs dropped, gaps named', async () => {
   const { note, problems } = cleanNote({
-    title: '  Add a greeter ', files: 'greet.py', what: 'Adds greet()', why: '',
+    title: '  Add a greeter ', tldr: 'greet() says hello.', files: 'greet.py', what: 'Adds greet()', why: '',
+    uses: [{ name: 'format', from: 'string', why: 'pads the name' }, { from: 'no name' }], lines: [{ anchor: 'def greet', says: 'the entry' }, { anchor: 'x' }], commit: 'ABC1234',
     basis: 'maybe', alternatives: ['a dict', 7],
     parameters: [{ name: 'timeout', meaning: 'seconds', doc_url: 'javascript:alert(1)' }, { meaning: 'no name' }],
     symbols: [{ name: 'Greeter', kind: 'class', why_exists: 'holds the name' }, { name: 'x', kind: 'gizmo', why_exists: 'y' }],
@@ -57,8 +60,12 @@ test('a note is cleaned: strings trimmed, lists coerced, bad URLs dropped, gaps 
   expect(note.alternatives).toEqual(['a dict', '7'])
   expect(note.parameters).toEqual([{ name: 'timeout', meaning: 'seconds', default: null, why_this_value: null, doc_url: null }])
   expect(note.symbols.map((s) => s.kind)).toEqual(['class', 'other'])
+  expect(note.uses).toEqual([{ name: 'format', from: 'string', why: 'pads the name', doc_url: null }])
+  expect(note.lines).toEqual([{ anchor: 'def greet', says: 'the entry' }])
+  expect(note.commit).toBe('abc1234')
+  expect(cleanNote({ commit: 'HEAD~1' }).note.commit).toBe(null)
   expect(problems).toEqual(['why is empty'])
-  expect(cleanNote({}).problems).toEqual(['title is empty', 'what is empty', 'why is empty', 'files is empty'])
+  expect(cleanNote({}).problems).toEqual(['title is empty', 'tldr is empty', 'what is empty', 'why is empty', 'files is empty'])
   expect(cleanRecap({ overview: 'Done', reading_order: [{ file: 'a.py', why: 'start' }, { why: 'no file' }] }).recap.reading_order).toEqual([{ file: 'a.py', why: 'start' }])
 })
 

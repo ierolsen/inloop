@@ -130,7 +130,7 @@ test('/inloop lang and detail change the next instructions, for all projects or 
   expect((await $.command.run(command('detail deep'))).text).toBe('From now on inloop notes are deep, in all your projects.')
   expect(await written()).toContain('never guess a URL')
   expect((await $.command.run(command('detail loud'))).text).toBe('Detail is brief, standard or deep.')
-  expect((await $.command.run(command('status'))).text).toContain('Notes are in English (the plugin setting), detail deep (your setting for all projects).')
+  expect((await $.command.run(command('status'))).text).toContain('Notes are in English (the plugin setting), detail deep (your setting for all projects), ADHD-friendly off (the plugin setting).')
   expect((await $.command.run(command('detail reset'))).text).toBe('inloop notes are standard again (the plugin setting).')
   expect((await $.command.run(command('fly'))).text).toStartWith('inloop has no command "fly".\ninloop commands:')
 })
@@ -319,4 +319,73 @@ test('/inloop open shows this session before anything reached the disk', async (
   await $.command.run(command('open'))
   expect(w.files.get(ROOT + '/.inloop/review/' + SESSION_ID + '.html')).toContain('Nothing recorded yet.')
   expect(w.files.has(LOG)).toBe(false)
+})
+
+test('/inloop adhd changes how the next notes are written, not how much they say', async ($, on) => {
+  const w = worldOf(on)
+  await $.session.start(START)
+  const written = async () => (await $.prompt.compose(COMPOSE as any)).sections.find((s) => s.id === 'inloop:instructions')?.text ?? ''
+  expect(await written()).not.toContain('How to write for this user')
+  expect((await $.command.run(command('adhd on'))).text).toStartWith('From now on inloop notes are written for easy reading, in all your projects')
+  const rules = await written()
+  expect(rules).toContain('How to write for this user')
+  expect(rules).toContain('Explain every term, abbreviation, symbol and formula')
+  expect(rules).toContain('Add `lines` comments for the lines a reader would stop at') // the detail level is unchanged
+  expect((await $.command.run(command('adhd off --project'))).text).toBe('From now on inloop notes are written in the usual form, in this project.')
+  expect(JSON.parse(w.files.get(ROOT + '/.inloop/config.json') ?? '{}')).toEqual({ adhd: 'off' })
+  expect(await written()).not.toContain('How to write for this user')
+  expect((await $.command.run(command('adhd on'))).text).toContain('This project has its own choice, off, which comes first here')
+  expect((await $.command.run(command('adhd maybe'))).text).toBe('Use /inloop adhd on or /inloop adhd off.')
+  expect((await $.command.run(command('adhd reset'))).text).toBe('ADHD-friendly notes are off again (the plugin setting).')
+})
+
+test('commits made through the shell are recorded with the edits and notes that went into them', async ($, on) => {
+  const git: Git = {
+    'git rev-parse --show-toplevel': ROOT + '\n',
+    'git rev-parse --verify --quiet HEAD': 'aaa\n',
+    'git status --porcelain=v1 -z --untracked-files=all': '',
+  }
+  const w = worldOf(on, { git })
+  const commit = (sha: string, parent: string, subject: string, files: string[]) => () => {
+    git['git rev-parse --verify --quiet HEAD'] = sha + '\n'
+    git['git rev-list --reverse --max-count=50 ' + parent + '..' + sha] = sha + '\n'
+    git['git show -s --format=%P%x00%s ' + sha] = parent + '\u0000' + subject + '\n'
+    git['git diff-tree --no-commit-id --name-only -r -z --root ' + sha] = files.join('\u0000') + '\u0000'
+  }
+  await $.session.start(START)
+  await $.turn.start({ text: 'build it', turnId: 't1' })
+  await $.tool.call({ ...note({ title: 'a', files: ['a.py'], what: 'w', why: 'y' }), tool_use_id: 'n1' })
+  await $.tool.call({ tool: 'Write', tool_use_id: 'w1', file_path: ROOT + '/a.py', content: 'a\n' } as any)
+  await $.tool.call({ ...note({ title: 'b', files: ['b.py'], what: 'w', why: 'y' }), tool_use_id: 'n2' })
+  await $.tool.call({ tool: 'Write', tool_use_id: 'w2', file_path: ROOT + '/b.py', content: 'b\n' } as any)
+  await $.tool.call({ ...note({ title: 'notes.txt by printf', files: ['notes.txt'], what: 'w', why: 'y' }), tool_use_id: 'n3' })
+  // a command that makes no commit records nothing
+  await $.tool.call({ tool: 'Bash', command: 'ls' } as any)
+  w.shell = commit('bbb', 'aaa', 'feat: add a', ['a.py', 'notes.txt'])
+  await $.tool.call({ tool: 'Bash', command: 'git commit -am a' } as any)
+  w.shell = commit('ccc', 'bbb', 'feat: add b', ['b.py'])
+  await $.tool.call({ tool: 'Bash', command: 'git commit -am b' } as any)
+  const commits = w.records().filter((r) => r.kind === 'commit')
+  expect(commits.map((c) => [c.sha, c.parents, c.subject, c.files, c.edits, c.notes])).toEqual([
+    ['bbb', ['aaa'], 'feat: add a', ['a.py', 'notes.txt'], ['w1'], ['n1', 'n3']],
+    ['ccc', ['bbb'], 'feat: add b', ['b.py'], ['w2'], ['n2']],
+  ])
+  // nothing new at the end of the turn
+  await $.turn.complete(turnDone('t1'))
+  expect(w.records().filter((r) => r.kind === 'commit')).toHaveLength(2)
+})
+
+test('a commit with none of Claude\'s work, made in a session that recorded nothing, writes nothing', async ($, on) => {
+  const git: Git = { 'git rev-parse --show-toplevel': ROOT + '\n', 'git rev-parse --verify --quiet HEAD': 'aaa\n', 'git status --porcelain=v1 -z --untracked-files=all': '' }
+  const w = worldOf(on, { git })
+  await $.session.start(START)
+  Object.assign(git, {
+    'git rev-parse --verify --quiet HEAD': 'bbb\n',
+    'git rev-list --reverse --max-count=50 aaa..bbb': 'bbb\n',
+    'git show -s --format=%P%x00%s bbb': 'aaa\u0000docs: by hand\n',
+    'git diff-tree --no-commit-id --name-only -r -z --root bbb': 'README.md\u0000',
+  })
+  await $.turn.start({ text: 'hi', turnId: 't1' })
+  await $.turn.complete(turnDone('t1'))
+  expect([...w.files.keys()]).toEqual([])
 })
