@@ -1,0 +1,4 @@
+{
+  "description": "inloop: a note for every change, the edits it covers, a live view and a review page",
+  "modules": ["./register.ts"]
+}

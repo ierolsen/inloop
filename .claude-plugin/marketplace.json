@@ -1,0 +1,14 @@
+{
+  "name": "inloop",
+  "description": "inloop: understand the code your agent writes, while it writes it.",
+  "owner": {
+    "name": "Erol Sen"
+  },
+  "plugins": [
+    {
+      "name": "inloop",
+      "source": "./plugins/inloop",
+      "description": "A short, structured note for every change Claude makes: what it does, why, its parameters and why each new class or function exists. Live while Claude works and as a review page, in the language you choose."
+    }
+  ]
+}

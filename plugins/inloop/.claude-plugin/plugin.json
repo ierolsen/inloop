@@ -1,0 +1,29 @@
+{
+  "name": "inloop",
+  "displayName": "inloop",
+  "version": "0.1.0",
+  "description": "Stay in the loop with the code your agent writes. Before each change Claude writes a short, structured note: what it does, why, its parameters and why each new class or function exists. You read the notes live while Claude works and later as a review page, in the language you choose.",
+  "author": {
+    "name": "Erol Sen",
+    "url": "https://erolsen.dev"
+  },
+  "homepage": "https://github.com/ierolsen/inloop",
+  "repository": "https://github.com/ierolsen/inloop",
+  "license": "MIT",
+  "keywords": ["code review", "explain", "agents", "learning", "mod", "i18n"],
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Language",
+      "description": "The language of inloop's notes and review page, as a name or a code (English, Türkçe, Deutsch, Nederlands, tr, de, nl ...). It does not depend on the language you chat in.",
+      "default": "English"
+    },
+    "detail": {
+      "type": "string",
+      "title": "Detail",
+      "description": "brief: what and why. standard: also the parameters that are not obvious, and why each new class or function exists. deep: also every parameter, with links to official documentation.",
+      "options": ["brief", "standard", "deep"],
+      "default": "standard"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# inloop writes its own notes here when you use it on this repository
+.inloop/
+# type declarations Claude Code writes beside a mod loaded with --plugin-dir
+plugins/inloop/.claude-plugin/types/
+plugins/inloop/tsconfig.json
+.DS_Store
+node_modules/
