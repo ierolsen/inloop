@@ -50,6 +50,12 @@ one project never write the same file. The session's records are kept in memory 
 after each change, one write at a time. `$.fs.write` replaces a file and allows 4 MiB, so the log
 rolls over to a new part before 3.5 MiB. Every line carries `"v": 1`.
 
+Nothing is written until the session records something: a note, an edit, a recap, or files
+changed outside the edit tools. Until then the session's first records stay in memory, so a
+session that only answers questions leaves no `.inloop/` folder, which matters because a plugin
+installed for the user runs in every folder Claude Code opens. The first write into `.inloop/`
+(a log, a project setting or a review page) puts `.inloop/.gitignore` in place first.
+
 ### Language
 
 The language is taken from the first of these that is set:

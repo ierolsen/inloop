@@ -6,13 +6,18 @@ import { worldOf, ROOT, SESSION_ID, LOG, START, COMPOSE, command, turnDone, note
 const edits = (w: { records: () => any[] }) => w.records().filter((r) => r.kind === 'edit')
 const DESCRIBE = { tool: 'mcp__inloop__note', description: 'Record a note.', provider: { plugin: 'inloop', tier: 'user' } } as any
 
-test('a session starts: tools and command registered, .inloop/ kept out of git, session and baseline logged', async ($, on) => {
+test('a session writes nothing until it records something; then .inloop/ keeps itself out of git', async ($, on) => {
   const w = worldOf(on)
   expect(await $.session.start(START)).toEqual({ cwd: ROOT })
   expect(w.tools).toEqual(['note', 'recap'])
   expect(w.commands).toEqual([expect.objectContaining({ name: 'inloop', immediate: true })])
+  // a session that only talks leaves no trace
+  await $.turn.start({ text: 'what does this repo do?', turnId: 't1' })
+  expect((await $.turn.complete(turnDone('t1'))).text).toBe('Done.')
+  expect([...w.files.keys()]).toEqual([])
+  await $.tool.call(note({ title: 'First', files: ['a.py'], what: 'w', why: 'y' }))
   expect(w.files.get(ROOT + '/.inloop/.gitignore')).toBe('*\n')
-  expect(w.records().map((r) => r.kind)).toEqual(['session', 'baseline'])
+  expect(w.records().map((r) => r.kind)).toEqual(['session', 'baseline', 'note'])
   expect(w.records()[0]).toMatchObject({ v: 1, session: SESSION_ID, root: ROOT, language: 'English', language_code: 'en', detail: 'standard', version: '0.1.0' })
   expect(w.records()[1]).toMatchObject({ git: false, head: null, dirty: [] })
 })
@@ -140,12 +145,12 @@ test('/inloop off stops the instructions and the capture for this session; on br
   await $.tool.call({ tool: 'Write', file_path: ROOT + '/a.py', content: 'a\n' } as any)
   expect(w.files.get(ROOT + '/a.py')).toBe('a\n')
   expect(edits(w)).toEqual([])
-  expect(w.records().filter((r) => r.kind === 'switch').map((r) => r.on)).toEqual([false])
 
   expect((await $.command.run(command('on'))).text).toBe('inloop is on: Claude writes a note before each change.')
   expect((await $.tool.describe(DESCRIBE)).isDeferred).toBe(false)
   await $.tool.call({ tool: 'Write', file_path: ROOT + '/b.py', content: 'b\n' } as any)
   expect(edits(w).map((r) => r.path)).toEqual(['b.py'])
+  expect(w.records().filter((r) => r.kind === 'switch').map((r) => r.on)).toEqual([false, true])
 })
 
 test('files changed outside the edit tools are listed when the turn ends, once', async ($, on) => {
@@ -157,10 +162,9 @@ test('files changed outside the edit tools are listed when the turn ends, once',
   }
   const w = worldOf(on, { git, files: { [ROOT + '/greet.py']: 'def greet():\n    pass\n' } })
   await $.session.start(START)
-  expect(w.records()[1]).toMatchObject({ kind: 'baseline', git: true, head: HEAD, dirty: ['notes.txt'] })
-
   await $.turn.start({ text: 'greet', turnId: 't1' })
   await $.tool.call(note({ title: 'Greeting', files: ['greet.py'], what: 'w', why: 'y' }))
+  expect(w.records()[1]).toMatchObject({ kind: 'baseline', git: true, head: HEAD, dirty: ['notes.txt'] })
   await $.tool.call({ tool: 'Edit', file_path: ROOT + '/greet.py', old_string: 'pass', new_string: 'return "hi"' } as any)
   // meanwhile a shell command rewrote run.sh and made gen.py; notes.txt was dirty before the session
   w.files.set(ROOT + '/gen.py', 'print("generated")\n')
@@ -286,12 +290,33 @@ test('/inloop open all writes a page for each session and a list of them', async
     { v: 1, kind: 'session', ts: 1, session: 'old-1', agent: null, turn: null, root: ROOT, language: 'English', language_code: 'en', detail: 'standard', version: '0.1.0' },
     { v: 1, kind: 'note', ts: 2, session: 'old-1', agent: null, turn: 't1', id: 'n1', n: 1, source: 'live', problems: [], note: { title: 'Set up the project', files: ['a.py'], what: 'w', why: 'y', basis: null, alternatives: [], parameters: [], symbols: [], risks: [] } },
   ]
-  const w = worldOf(on, { files: { [ROOT + '/.inloop/log/old-1.jsonl']: old.map((r) => JSON.stringify(r) + '\n').join('') } })
+  const quiet = [{ ...old[0], session: 'quiet-1' }, { v: 1, kind: 'baseline', ts: 1, session: 'quiet-1', agent: null, turn: null, git: false, head: null, dirty: [] }]
+  const lines = (records: any[]) => records.map((r) => JSON.stringify(r) + '\n').join('')
+  const w = worldOf(on, { files: { [ROOT + '/.inloop/log/old-1.jsonl']: lines(old), [ROOT + '/.inloop/log/quiet-1.jsonl']: lines(quiet) } })
   await $.session.start(START)
   const list = ROOT + '/.inloop/review/index.html'
   expect((await $.command.run(command('open all'))).text).toBe('The list of sessions is at ' + list)
   const html = w.files.get(list) ?? ''
   expect(html).toContain('<a href="old-1.html">Set up the project</a>')
-  expect(html).toContain('<a href="' + SESSION_ID + '.html">Session without notes</a>')
+  // sessions that recorded nothing are left off: an old quiet one, and this one so far
+  expect(html).not.toContain('quiet-1.html')
+  expect(html).not.toContain(SESSION_ID + '.html')
   expect(w.files.get(ROOT + '/.inloop/review/old-1.html')).toContain('href="index.html"')
+})
+
+test('a project setting writes .inloop/ with its .gitignore', async ($, on) => {
+  const w = worldOf(on)
+  await $.session.start(START)
+  await $.command.run(command('detail deep --project'))
+  expect(JSON.parse(w.files.get(ROOT + '/.inloop/config.json') ?? '{}')).toEqual({ detail: 'deep' })
+  expect(w.files.get(ROOT + '/.inloop/.gitignore')).toBe('*\n')
+  expect(w.files.has(LOG)).toBe(false)
+})
+
+test('/inloop open shows this session before anything reached the disk', async ($, on) => {
+  const w = worldOf(on)
+  await $.session.start(START)
+  await $.command.run(command('open'))
+  expect(w.files.get(ROOT + '/.inloop/review/' + SESSION_ID + '.html')).toContain('Nothing recorded yet.')
+  expect(w.files.has(LOG)).toBe(false)
 })

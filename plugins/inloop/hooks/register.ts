@@ -37,6 +37,8 @@ let records: LogRecord[] = [] // the log part being written
 let part = 1
 let partSize = 0
 let writing: Promise<unknown> = Promise.resolve()
+let stored = false // the log is on disk; a session that records nothing writes nothing
+let ignored = false // .inloop/.gitignore is in place
 let pairing = new Pairing()
 let turn: string | null = null
 let git = false
@@ -59,6 +61,8 @@ function reset() {
   part = 1
   partSize = 0
   writing = Promise.resolve()
+  stored = false
+  ignored = false
   pairing = new Pairing()
   turn = null
   git = false
@@ -75,6 +79,24 @@ const now = () => Date.now()
 
 // ---- the log ----------------------------------------------------------------------------------
 
+// What makes a session worth a log on disk: a note, an edit, a recap, or files changed outside
+// the edit tools. Until one comes, the session's records stay in memory, so a session that only
+// talks leaves no .inloop/ folder behind.
+const recordsSomething = (r: LogRecord) =>
+  r.kind === 'note' || r.kind === 'edit' || r.kind === 'recap' || (r.kind === 'outside' && (r.entries.length > 0 || r.more > 0))
+
+// .inloop/ keeps itself out of git, so nothing inloop writes is committed by accident. Runs before
+// inloop first writes anything there.
+async function keepOutOfGit($: any) {
+  if (ignored) return
+  try {
+    if (!(await $.fs.exists(root + '/' + DIR + '/.gitignore'))) await $.fs.write(root + '/' + DIR + '/.gitignore', '*\n')
+  } catch {
+    // a read-only project still gets its notes in this session's memory
+  }
+  ignored = true
+}
+
 // Adds one record and writes the session's current part whole, one write at a time.
 async function append($: any, record: LogRecord) {
   const size = bytes(line(record))
@@ -85,6 +107,11 @@ async function append($: any, record: LogRecord) {
   }
   records.push(record)
   partSize += size
+  if (!stored && !recordsSomething(record)) return
+  if (!stored) {
+    await keepOutOfGit($)
+    stored = true
+  }
   const path = partPath(root, session, part)
   const content = records.map(line).join('')
   writing = writing.then(() => $.fs.write(path, content)).catch(() => undefined)
@@ -102,6 +129,7 @@ async function loadLog($: any) {
     if (!(await $.fs.exists(path))) break
     const text = await $.fs.read(path)
     const parsed = parse(text)
+    stored = true
     part = p
     records = parsed
     partSize = bytes(text)
@@ -150,6 +178,7 @@ async function setSetting($: any, key: 'language' | 'detail', value: string | nu
     if (value === null && !(key in current)) return loadSettings($)
     if (value === null) delete current[key]
     else current[key] = value
+    await keepOutOfGit($)
     await $.fs.write(root + '/' + CONFIG, JSON.stringify(current, null, 2) + '\n')
   } else {
     const current = await readUser($)
@@ -286,12 +315,6 @@ async function start($: any) {
     repoRoot = null
   }
   root = (repoRoot ?? (await $.session.root())).replace(/\\/g, '/').replace(/\/+$/, '')
-  // .inloop/ keeps itself out of git, so nothing it writes is committed by accident
-  try {
-    if (!(await $.fs.exists(root + '/' + DIR + '/.gitignore'))) await $.fs.write(root + '/' + DIR + '/.gitignore', '*\n')
-  } catch {
-    // a read-only project still gets its notes in this session's memory
-  }
   await loadSettings($)
   // A log that is already there is continued: the plugin was reloaded, or the session resumed.
   // Either way the outside-changes check starts again from how the project is now, so work
@@ -331,14 +354,18 @@ async function mtime($: any, path: string): Promise<number> {
   }
 }
 
-// Writes the review page of one session from its log. Pages are written again each time, so a
-// newer inloop or another language redraws the old ones too.
-async function writePage($: any, id: string, back: boolean) {
+// Writes the review page of one session from its log (this session's may still be in memory).
+// Pages are written again each time, so a newer inloop or another language redraws old ones too.
+// With skipEmpty, another session that recorded nothing gets no page: path is null.
+async function writePage($: any, id: string, back: boolean, skipEmpty = false) {
   const code = shownIn(settings.language.code)
   const l = labels(code)
-  const page = build(await readSession($, id))
+  const page = build(id === session && !stored ? records : await readSession($, id))
+  const empty = !page.counts.notes && !page.counts.edits && !page.counts.outside
+  if (skipEmpty && empty && id !== session) return { path: null, page, trimmed: 0 }
   const path = root + '/' + REVIEW_DIR + '/' + id + '.html'
   const { html, trimmed } = fit(page, l, { code, log: LOG_DIR + '/' + id + '.jsonl', back: back ? 'index.html' : undefined })
+  await keepOutOfGit($)
   await $.fs.write(path, html)
   return { path, page, trimmed }
 }
@@ -371,7 +398,7 @@ async function openReview($: any, all: boolean, l: Labels): Promise<string> {
   }
   if (!all) {
     const { path, trimmed } = await writePage($, session, false)
-    return say((await show($, path)) ? l.open_opened : l.open_written, { path }) + (trimmed ? '\n' + l.open_trimmed : '')
+    return say((await show($, path!)) ? l.open_opened : l.open_written, { path: path! }) + (trimmed ? '\n' + l.open_trimmed : '')
   }
   let names: string[] = []
   try {
@@ -384,7 +411,8 @@ async function openReview($: any, all: boolean, l: Labels): Promise<string> {
   found.sort((a, b) => b.changed - a.changed)
   const rows: SessionRow[] = []
   for (const { id } of found.slice(0, SESSIONS_MAX)) {
-    const { page } = await writePage($, id, true)
+    const { path, page } = await writePage($, id, true, true)
+    if (!path) continue
     rows.push({ href: id + '.html', started: page.started, title: titleOf(page), notes: page.counts.notes, edits: page.counts.edits, unexplained: page.counts.unexplained })
   }
   const code = shownIn(settings.language.code)
