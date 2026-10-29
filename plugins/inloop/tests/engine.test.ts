@@ -135,6 +135,7 @@ test('/inloop off stops the instructions and the capture for this session; on br
   await $.tool.call({ tool: 'Write', file_path: ROOT + '/a.py', content: 'a\n' } as any)
   expect(w.files.get(ROOT + '/a.py')).toBe('a\n')
   expect(edits(w)).toEqual([])
+  expect(w.records().filter((r) => r.kind === 'switch').map((r) => r.on)).toEqual([false])
 
   expect((await $.command.run(command('on'))).text).toBe('inloop is on: Claude writes a note before each change.')
   expect((await $.tool.describe(DESCRIBE)).isDeferred).toBe(false)
@@ -210,8 +211,35 @@ test('a reloaded plugin continues the session log it finds', async ($, on) => {
   ]
   const w = worldOf(on, { files: { [LOG]: earlier.map((r) => JSON.stringify(r) + '\n').join('') } })
   await $.session.start(START)
-  expect(w.records().map((r) => r.kind)).toEqual(['session', 'baseline', 'note', 'edit'])
+  // no second session record; a new baseline, so the outside check starts from the project as it is now
+  expect(w.records().map((r) => r.kind)).toEqual(['session', 'baseline', 'note', 'edit', 'baseline'])
   expect((await $.command.run(command('status'))).text).toContain('This session: 2 notes, 1 edit (1 without a note), 0 files changed outside the edit tools.')
   expect(await $.tool.call(note({ title: 't', files: ['a.py'], what: 'w', why: 'y' }))).toEqual({ result: 'inloop: note 3 saved.' })
-  expect(w.records().map((r) => r.kind)).toEqual(['session', 'baseline', 'note', 'edit', 'note'])
+  expect(w.records().map((r) => r.kind)).toEqual(['session', 'baseline', 'note', 'edit', 'baseline', 'note'])
+})
+
+test('a reload keeps inloop off when the log says it was turned off', async ($, on) => {
+  const base = { v: 1, session: SESSION_ID, agent: null, turn: null }
+  const earlier = [
+    { ...base, kind: 'session', ts: 1, root: ROOT, language: 'English', language_code: 'en', detail: 'standard', version: '0.1.0' },
+    { ...base, kind: 'baseline', ts: 1, git: false, head: null, dirty: [] },
+    { ...base, kind: 'switch', ts: 2, on: false },
+  ]
+  const w = worldOf(on, { files: { [LOG]: earlier.map((r) => JSON.stringify(r) + '\n').join('') } })
+  await $.session.start(START)
+  expect((await $.prompt.compose(COMPOSE as any)).sections.map((s) => s.id)).toEqual(['core:intro'])
+  expect((await $.command.run(command('status'))).text).toStartWith('inloop is off.')
+  await $.tool.call({ tool: 'Write', file_path: ROOT + '/a.py', content: 'a\n' } as any)
+  expect(edits(w)).toEqual([])
+})
+
+test('files outside the project and inloop\'s own files are not recorded as edits', async ($, on) => {
+  const w = worldOf(on)
+  await $.session.start(START)
+  await $.turn.start({ text: 'plan it', turnId: 't1' })
+  await $.tool.call({ tool: 'Write', file_path: '/home/me/.claude/plans/plan.md', content: '# Plan\n' } as any)
+  await $.tool.call({ tool: 'Write', file_path: ROOT + '/.inloop/config.json', content: '{}\n' } as any)
+  expect(w.files.get('/home/me/.claude/plans/plan.md')).toBe('# Plan\n')
+  expect(edits(w)).toEqual([])
+  expect((await $.turn.complete(turnDone('t1'))).text).toBe('Done.')
 })

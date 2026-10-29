@@ -39,7 +39,9 @@ export type BaselineRecord = Base & { kind: 'baseline'; git: boolean; head: stri
 export type OutsideEntry = { path: string; state: 'added' | 'modified' | 'deleted'; diff: string | null; added: number; removed: number; truncated: boolean; skipped: Skipped | null; redactions: number }
 export type OutsideRecord = Base & { kind: 'outside'; entries: OutsideEntry[]; more: number }
 
-export type LogRecord = SessionRecord | NoteRecord | RecapRecord | EditRecord | BaselineRecord | OutsideRecord
+// /inloop on and off: the page shows when nothing was recorded, and a reload keeps the choice
+export type SwitchRecord = Base & { kind: 'switch'; on: boolean }
+export type LogRecord = SessionRecord | NoteRecord | RecapRecord | EditRecord | BaselineRecord | OutsideRecord | SwitchRecord
 
 export function line(record: LogRecord): string {
   return JSON.stringify(record) + '\n'

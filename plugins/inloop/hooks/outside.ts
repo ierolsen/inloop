@@ -23,7 +23,8 @@ export function porcelain(stdout: string): string[] {
   return paths
 }
 
-const inloopOwn = (path: string) => path === '.inloop' || path.startsWith('.inloop/')
+// inloop's own folder, which no list of changes includes
+export const inloopOwn = (path: string) => path === '.inloop' || path.startsWith('.inloop/')
 
 // Files changed since the baseline that inloop has no edit for, in a stable order.
 // `changed` and `untracked` come from git now; `dirty` was changed already when the session started.

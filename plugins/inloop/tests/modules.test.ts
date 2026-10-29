@@ -2,7 +2,7 @@
 import { expect, test } from 'claude-code/testing'
 import { language, resolve, detail, languageName, fold } from '../hooks/config.ts'
 import { instructions } from '../hooks/instructions.ts'
-import { cleanNote, cleanRecap, relative, sameFile, Pairing } from '../hooks/note.ts'
+import { cleanNote, cleanRecap, relative, inside, sameFile, Pairing } from '../hooks/note.ts'
 import { diff, lines, isBinary } from '../hooks/diff.ts'
 import { redact, redactDeep, sensitive, REDACTED } from '../hooks/redact.ts'
 import { parse, line, sessionsOf, partPath } from '../hooks/log.ts'
@@ -68,6 +68,12 @@ test('paths become relative to the project, and a note names a file by any suffi
   expect(relative('./src/a.ts', '/repo')).toBe('src/a.ts')
   expect(relative('C:\\repo\\src\\a.ts', 'C:\\repo')).toBe('src/a.ts')
   expect(relative('/elsewhere/a.ts', '/repo')).toBe('/elsewhere/a.ts')
+  expect(inside('/repo/src/a.ts', '/repo')).toBe(true)
+  expect(inside('src/a.ts', '/repo')).toBe(true)
+  expect(inside('/repo2/a.ts', '/repo')).toBe(false)
+  expect(inside('/home/me/.claude/plans/plan.md', '/repo')).toBe(false)
+  expect(inside('../a.ts', '/repo')).toBe(false)
+  expect(inside('c:\\Repo\\a.ts', 'C:/repo')).toBe(true)
   expect(sameFile('a.ts', 'src/a.ts')).toBe(true)
   expect(sameFile('src/a.ts', 'src/a.ts')).toBe(true)
   expect(sameFile('ba.ts', 'src/a.ts')).toBe(false)

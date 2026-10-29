@@ -3,11 +3,11 @@
 
 import { resolve, language as parseLanguage, detail as parseDetail, languageName, type Settings } from './config.ts'
 import { instructions, NOTE_SPEC, RECAP_SPEC } from './instructions.ts'
-import { cleanNote, cleanRecap, relative, Pairing } from './note.ts'
+import { cleanNote, cleanRecap, relative, inside, Pairing } from './note.ts'
 import { diff, isBinary } from './diff.ts'
 import { redact, redactDeep, sensitive } from './redact.ts'
 import { SCHEMA, DIR, CONFIG, PART_BYTES, line, parse, partPath, bytes, type LogRecord, type OutsideEntry, type Skipped } from './log.ts'
-import { nul, porcelain, unaccounted, state, hunks, counts, OUTSIDE_MAX } from './outside.ts'
+import { nul, porcelain, unaccounted, state, hunks, counts, inloopOwn, OUTSIDE_MAX } from './outside.ts'
 import { labels, hasLabels, say, count } from './i18n/index.ts'
 
 const PLUGIN = 'inloop'
@@ -15,6 +15,7 @@ const VERSION = '0.1.0'
 const SECTION = PLUGIN + ':instructions'
 const READ_MAX = 1_000_000 // bytes of a file read for a diff; larger files are logged without one
 const DIFF_LINES = 400
+const NOTHING_OUTSIDE = '[[],0]' // fingerprint() of an empty list: where every baseline starts
 
 type Snapshot = { text: string; exists: boolean; skipped: Skipped | null }
 
@@ -37,7 +38,7 @@ let git = false
 let head: string | null = null
 let dirty = new Set<string>()
 let logged = new Set<string>() // files with an edit in this session's log
-let lastOutside = ''
+let lastOutside = NOTHING_OUTSIDE
 let tally = { notes: 0, edits: 0, unexplained: 0, outside: 0 }
 let turnTally = { notes: 0, edits: 0, unexplained: 0 }
 
@@ -58,7 +59,7 @@ function reset() {
   head = null
   dirty = new Set()
   logged = new Set()
-  lastOutside = ''
+  lastOutside = NOTHING_OUTSIDE
   tally = { notes: 0, edits: 0, unexplained: 0, outside: 0 }
   turnTally = { notes: 0, edits: 0, unexplained: 0 }
 }
@@ -101,7 +102,8 @@ async function loadLog($: any) {
     for (const r of parsed) {
       if (r.kind === 'note') tally.notes = Math.max(tally.notes, r.n)
       if (r.kind === 'edit' && r.status === 'ok') { tally.edits++; logged.add(r.path); if (!r.note) tally.unexplained++ }
-      if (r.kind === 'baseline') { git = r.git; head = r.head; dirty = new Set(r.dirty) }
+      if (r.kind === 'baseline') { git = r.git; head = r.head; dirty = new Set(r.dirty); tally.outside = 0; lastOutside = NOTHING_OUTSIDE }
+      if (r.kind === 'switch') enabled = r.on
       if (r.kind === 'outside') { tally.outside = r.entries.length + r.more; lastOutside = fingerprint(r.entries, r.more) }
     }
   }
@@ -174,6 +176,8 @@ async function takeBaseline($: any) {
     dirty = new Set(porcelain(s.out).filter((p) => p !== DIR && !p.startsWith(DIR + '/')))
   }
   await append($, { v: SCHEMA, kind: 'baseline', ts: now(), session, agent: null, turn, git, head, dirty: [...dirty] })
+  tally.outside = 0
+  lastOutside = NOTHING_OUTSIDE
 }
 
 function fingerprint(entries: OutsideEntry[], more: number): string {
@@ -283,14 +287,17 @@ async function start($: any) {
     // a read-only project still gets its notes in this session's memory
   }
   await loadSettings($)
+  // A log that is already there is continued: the plugin was reloaded, or the session resumed.
+  // Either way the outside-changes check starts again from how the project is now, so work
+  // done by hand while the session was closed is not put down to it.
   const continued = await loadLog($)
   if (!continued) {
     await append($, {
       v: SCHEMA, kind: 'session', ts: now(), session, agent: null, turn: null, root,
       language: languageName(settings.language), language_code: settings.language.code, detail: settings.detail.value, version: VERSION,
     })
-    await takeBaseline($)
   }
+  await takeBaseline($)
   ready = true
 }
 
@@ -385,8 +392,8 @@ export function register(on: any, pluginOptions: any) {
   // Every edit is captured around the tool call. Whatever happens, the call goes on: every path
   // below ends in next(e), and a capture that fails is skipped.
   on('tool.call', { tool: ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'] }, async ($: any, e: any, next: any) => {
-    if (!enabled || !ready) return next(e)
     const path = String(e.file_path ?? e.notebook_path ?? '')
+    if (!enabled || !ready || !inside(path, root) || inloopOwn(relative(path, root))) return next(e)
     let before: Snapshot = { text: '', exists: false, skipped: 'unreadable' }
     try {
       before = await snapshot($, path)
@@ -430,6 +437,7 @@ export function register(on: any, pluginOptions: any) {
     if (command === 'status') return { text: statusText() }
     if (command === 'on' || command === 'off') {
       enabled = command === 'on'
+      await append($, { v: SCHEMA, kind: 'switch', ts: now(), session, agent: null, turn, on: enabled })
       try {
         await $.ui.invalidate('tool.describe')
       } catch {

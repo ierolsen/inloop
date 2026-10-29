@@ -94,6 +94,15 @@ export function cleanRecap(input: Record<string, unknown>): { recap: Recap; prob
   return { recap, problems }
 }
 
+// Whether a path lies in the project. Claude also writes files elsewhere (a plan, its memory,
+// scratch files); those are not the project's code and are left out.
+export function inside(path: string, root: string): boolean {
+  const p = path.replace(/\\/g, '/')
+  const r = root.replace(/\\/g, '/').replace(/\/+$/, '')
+  if (!/^([A-Za-z]:)?\//.test(p)) return p !== '..' && !p.startsWith('../') // relative: from the project
+  return /^[A-Za-z]:/.test(p) ? p.toLowerCase().startsWith(r.toLowerCase() + '/') : p.startsWith(r + '/')
+}
+
 // "./src/a.ts", "src\\a.ts" and "/repo/src/a.ts" (with root "/repo") all become "src/a.ts".
 export function relative(path: string, root: string): string {
   let p = path.replace(/\\/g, '/')
