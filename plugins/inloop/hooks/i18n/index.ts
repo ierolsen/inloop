@@ -2,8 +2,11 @@
 // the English ones; a label missing from a language falls back to English too.
 
 import { en, type Labels } from './en.ts'
+import { tr } from './tr.ts'
+import { de } from './de.ts'
+import { nl } from './nl.ts'
 
-const LABELS: Record<string, Partial<Labels>> = { en }
+const LABELS: Record<string, Partial<Labels>> = { en, tr, de, nl }
 
 export type Plural = { one: string; other: string; [category: string]: string }
 

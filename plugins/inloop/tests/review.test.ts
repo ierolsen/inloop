@@ -1,16 +1,40 @@
 // The review page: labels in every language, the page model, and the HTML.
 import { expect, test } from 'claude-code/testing'
+import { en } from '../hooks/i18n/en.ts'
+import { tr } from '../hooks/i18n/tr.ts'
+import { de } from '../hooks/i18n/de.ts'
+import { nl } from '../hooks/i18n/nl.ts'
 import { labels, count, nameOf } from '../hooks/i18n/index.ts'
 import { language } from '../hooks/config.ts'
 import { build, roleOf, fixedOrder, titleOf, diffs } from '../hooks/review/model.ts'
 import { render, fit, diffTable, sessions, inline } from '../hooks/review/render.ts'
 import { bytes } from '../hooks/log.ts'
 
+const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',')
+
+test('every language has every label, with the same placeholders and both plural forms', async () => {
+  for (const [name, lang] of Object.entries({ tr, de, nl })) {
+    expect(Object.keys(lang).sort(), name).toEqual(Object.keys(en).sort())
+    for (const [key, value] of Object.entries(en)) {
+      const theirs = (lang as any)[key]
+      if (typeof value === 'string') expect(placeholders(theirs), name + '.' + key).toBe(placeholders(value))
+      else {
+        expect(Object.keys(theirs).sort(), name + '.' + key).toEqual(['one', 'other'])
+        expect(placeholders(theirs.one), name + '.' + key).toBe(placeholders(value.one))
+        expect(placeholders(theirs.other), name + '.' + key).toBe(placeholders(value.other))
+      }
+      expect(JSON.stringify(theirs), name + '.' + key).not.toContain('\u2014')
+    }
+  }
+})
+
 test('counts and language names follow the reader\'s language', async () => {
-  expect([1, 2].map((n) => count('en', labels('en').notes, n))).toEqual(['1 note', '2 notes'])
+  expect([1, 2].map((n) => count('de', labels('de').notes, n))).toEqual(['1 Notiz', '2 Notizen'])
+  expect([1, 3].map((n) => count('tr', labels('tr').files, n))).toEqual(['1 dosya', '3 dosya'])
+  expect(nameOf(language('tr')!, 'tr')).toBe('Türkçe')
+  expect(nameOf(language('de')!, 'tr')).toBe('Almanca (Deutsch)')
   expect(nameOf(language('tr')!, 'en')).toBe('Turkish (Türkçe)')
-  expect(nameOf(language('en')!, 'en')).toBe('English')
-  expect(nameOf(language('Klingon')!, 'en')).toBe('Klingon')
+  expect(nameOf(language('Klingon')!, 'tr')).toBe('Klingon')
 })
 
 // A small session: two tasks, a subagent, an unexplained edit, a change made by a shell command.
@@ -96,9 +120,17 @@ test('the page escapes what it shows and loads nothing', async () => {
   expect(html).not.toContain('\u2014')
 })
 
-test('the page names what it shows in its labels\' language', async () => {
-  const enHtml = render(build(RECORDS), labels('en'), { code: 'en', log: '.inloop/log/s1.jsonl', back: 'index.html' })
-  for (const word of ['<html lang="en">', 'Start here', 'Check by hand', 'Run <code>pytest</code>.', 'not named in the note', 'Claude left this out of the note: Why.', 'subagent sub-1', 'href="index.html"', 'inloop was turned off on', '3 notes, 5 edits in 7 files', '2 more files not listed.']) expect(enHtml).toContain(word)
+test('the page reads in the language of its labels', async () => {
+  const page = () => build(RECORDS)
+  const trHtml = render(page(), labels('tr'), { code: 'tr', log: 'x' })
+  expect(trHtml).toContain('<html lang="tr">')
+  for (const word of ['Neden', 'Okuma sırası', 'Notsuz düzenlemeler', 'Görev 2', 'Sınıf ve fonksiyon dizini', '3 not, 7 dosya içinde 5 düzenleme']) expect(trHtml).toContain(word)
+  const deHtml = render(page(), labels('de'), { code: 'de', log: 'x' })
+  for (const word of ['Warum', 'Lesereihenfolge', '3 Notizen, 5 Änderungen in 7 Dateien', '2 weitere Dateien nicht aufgeführt.']) expect(deHtml).toContain(word)
+  const nlHtml = render(page(), labels('nl'), { code: 'nl', log: 'x' })
+  for (const word of ['Waarom', 'Leesvolgorde', 'Wijzigingen zonder notitie']) expect(nlHtml).toContain(word)
+  const enHtml = render(page(), labels('en'), { code: 'en', log: '.inloop/log/s1.jsonl', back: 'index.html' })
+  for (const word of ['Start here', 'Check by hand', 'Run <code>pytest</code>.', 'not named in the note', 'Claude left this out of the note: Why.', 'subagent sub-1', 'href="index.html"', 'inloop was turned off on']) expect(enHtml).toContain(word)
 })
 
 test('a diff shows old and new line numbers', async () => {

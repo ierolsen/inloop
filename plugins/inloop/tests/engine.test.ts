@@ -100,18 +100,18 @@ test('/inloop lang and detail change the next instructions, for all projects or 
   const written = async () => (await $.prompt.compose(COMPOSE as any)).sections.find((s) => s.id === 'inloop:instructions')?.text ?? ''
   expect(await written()).toContain('English')
 
-  expect((await $.command.run(command('lang Türkçe'))).text).toBe(
-    'From now on inloop notes are in Turkish (Türkçe), in all your projects.\n' +
-    'inloop has no labels in Turkish (Türkçe) yet, so its own messages stay in English; the notes themselves are in Turkish (Türkçe).')
+  // the reply comes in the new language, which has labels of its own
+  expect((await $.command.run(command('lang Türkçe'))).text).toBe('inloop notlarının dili bundan sonra tüm projelerde: Türkçe.')
   expect(await written()).toContain('Turkish (Türkçe)')
 
-  expect((await $.command.run(command('lang de --project'))).text).toContain('From now on inloop notes are in German (Deutsch), in this project.')
+  expect((await $.command.run(command('lang de --project'))).text).toBe('Sprache der inloop-Notizen ab jetzt, in diesem Projekt: Deutsch.')
   expect(JSON.parse(w.files.get(ROOT + '/.inloop/config.json') ?? '{}')).toEqual({ language: 'de' })
   expect(await written()).toContain('German (Deutsch)')
 
   // the project's own choice comes first, and the command says so
-  expect((await $.command.run(command('lang nl'))).text).toContain('This project has its own choice, German (Deutsch), which comes first here')
-  expect((await $.command.run(command('lang reset --project'))).text).toBe('inloop notes are in Dutch (Nederlands) again (your setting for all projects).')
+  expect((await $.command.run(command('lang nl'))).text).toBe('Sprache der inloop-Notizen ab jetzt, in allen Projekten: Niederländisch (Nederlands).\n' +
+    'Dieses Projekt hat eine eigene Wahl, Deutsch, die hier Vorrang hat; /inloop lang reset --project entfernt sie.')
+  expect((await $.command.run(command('lang reset --project'))).text).toBe('De inloop-notities zijn weer in Nederlands (je instelling voor alle projecten).')
   // the plugin's own setting (its default, English, as /config shows it) is what reset goes back to
   expect((await $.command.run(command('lang reset'))).text).toBe('inloop notes are in English again (the plugin setting).')
   expect((await $.command.run(command('lang'))).text).toBe('Name a language, as in /inloop lang Turkish or /inloop lang de.')
@@ -257,9 +257,9 @@ test('/inloop open writes the review page and says where it is', async ($, on) =
   await $.tool.call({ tool: 'Write', file_path: ROOT + '/greet.py', content: 'def greet():\n    pass\n' } as any)
   const page = ROOT + '/.inloop/review/' + SESSION_ID + '.html'
   // no browser could be opened here, so the path is the answer
-  expect((await $.command.run(command('open'))).text).toBe('The review page is at ' + page)
+  expect((await $.command.run(command('open'))).text).toBe('İnceleme sayfası hazır: ' + page)
   const html = w.files.get(page) ?? ''
-  expect(html).toContain('<html lang="en">')
+  expect(html).toContain('<html lang="tr">')
   expect(html).toContain('Selamlama fonksiyonu')
   expect(html).toContain('<td class="m">+</td><td class="c">def greet():</td>')
   expect(html).toContain('.inloop/log/' + SESSION_ID + '.jsonl')
