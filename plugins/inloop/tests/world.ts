@@ -22,6 +22,9 @@ export type World = {
   broken: { fs: boolean }
   refused: Set<string> // paths whose edits the person refuses
   ran: string[] // command lines inloop ran, git's and others'
+  panes: Map<string, boolean> // open panes, and whether each found room
+  room: boolean // whether a pane that opens finds room
+  toasts: string[]
   // the log of this session as inloop wrote it, line by line
   records: () => any[]
 }
@@ -37,6 +40,9 @@ export function worldOf(on: On, given: { files?: Record<string, string>; git?: G
     broken: { fs: false },
     refused: new Set(),
     ran: [],
+    panes: new Map(),
+    room: true,
+    toasts: [],
     records: () => (world.files.get(LOG) ?? '').split('\n').filter(Boolean).map((l) => JSON.parse(l)),
   }
   const files = world.files
@@ -75,7 +81,12 @@ export function worldOf(on: On, given: { files?: Record<string, string>; git?: G
   on('tool.register', ($: any, e: any) => { world.tools.push(e.name); return { value: { tool: 'mcp__inloop__' + e.name } } })
   on('command.register', ($: any, e: any) => { world.commands.push(e); return { value: { command: e.name } } })
   on('ui.log', ($: any, e: any) => { world.lines.push(e.text); return { value: undefined } })
-  on('ui.invalidate', ($: any, e: any) => { world.invalidated.push(e.event); return { value: undefined } })
+  // invalidations are noted and passed on, so a mounted drawing follows them
+  on('ui.invalidate', ($: any, e: any, next: any) => { world.invalidated.push(e.event); return next(e) })
+  on('ui.open', ($: any, e: any) => { world.panes.set(e.id, world.room); return { value: undefined } })
+  on('ui.close', ($: any, e: any) => { world.panes.delete(e.id); return { value: undefined } })
+  on('ui.panes', () => ({ value: [...world.panes].map(([id, placed]) => ({ id, title: id, isShown: true, isFocused: true, isPlaced: placed })) }))
+  on('ui.toast', ($: any, e: any) => { world.toasts.push(e.text); return { value: undefined } })
 
   // the engine's own answers, beneath every plugin
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))

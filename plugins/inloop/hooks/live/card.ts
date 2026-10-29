@@ -1,0 +1,51 @@
+// The live card: the note tool's row in the transcript, drawn as the note itself in the reader's
+// language instead of the call's raw arguments; the recap's row likewise. Plain module: register.ts
+// hands in the surface's elements (`$.ui.resolve(e)`).
+
+import type { Labels } from '../i18n/en.ts'
+import { say } from '../i18n/index.ts'
+import type { Note, Recap } from '../note.ts'
+
+// A Markdown or Code leaf holds at most 10,000 characters, a whole tree 100,000.
+export const LEAF = 9000
+export const clip = (text: string, max = LEAF) => (text.length > max ? text.slice(0, max - 3) + '...' : text)
+const code = (s: string) => '`' + s.replace(/`/g, "'") + '`'
+const list = (items: string[]) => items.map((x) => '- ' + x).join('\n')
+const block = (t: any, title: string, body: string) => t.Markdown({ text: clip('**' + title + '**\n' + body) })
+
+export function head(t: any, parts: string[]): any {
+  return t.Text({ children: [t.Text({ color: 'cyan', bold: true, children: 'inloop' }), t.Text({ dimColor: true, children: ' · ' + parts.join(' · ') })] })
+}
+
+const frame = (t: any, children: any[]) => t.Box({ flexDirection: 'column', borderStyle: 'round', borderColor: 'cyan', paddingX: 1, children })
+
+export function noteCard(t: any, note: Note, n: number | null, reconstructed: boolean, l: Labels): any {
+  const tags = [n ? say(l.page_in_note, { n }) : say(l.page_in_note, { n: '' }).trim()]
+  if (note.basis === 'verified') tags.push(l.page_basis_verified)
+  if (note.basis === 'judgment') tags.push(l.page_basis_judgment)
+  if (reconstructed) tags.push(l.page_reconstructed)
+  const parts: any[] = [head(t, tags), t.Text({ bold: true, children: note.title })]
+  if (note.files.length) parts.push(t.Text({ dimColor: true, children: note.files.join(' · ') }))
+  // while Claude still streams the call, fields arrive one by one: draw what has arrived
+  if (note.what) parts.push(t.Markdown({ text: clip('**' + l.page_what + ':** ' + note.what) }))
+  if (note.why) parts.push(t.Markdown({ text: clip('**' + l.page_why + ':** ' + note.why) }))
+  if (note.symbols.length) {
+    parts.push(block(t, l.page_symbols, list(note.symbols.map((s) => code(s.name) + ' (' + l[('page_kind_' + s.kind) as 'page_kind_class'] + '): ' + s.why_exists))))
+  }
+  if (note.parameters.length) {
+    parts.push(block(t, l.page_parameters, list(note.parameters.map((p) => code(p.name) + (p.default ? ' = ' + code(p.default) : '') + ': ' + (p.why_this_value || p.meaning)))))
+  }
+  if (note.alternatives.length) parts.push(block(t, l.page_alternatives, list(note.alternatives)))
+  if (note.risks.length) parts.push(block(t, l.page_risks, list(note.risks)))
+  return frame(t, parts)
+}
+
+export function recapCard(t: any, recap: Recap, l: Labels): any {
+  const parts: any[] = [head(t, [l.page_summary])]
+  if (recap.overview) parts.push(t.Markdown({ text: clip(recap.overview) }))
+  if (recap.reading_order.length) {
+    parts.push(block(t, l.page_start_here, recap.reading_order.map((r, i) => i + 1 + '. ' + code(r.file) + (r.why ? ': ' + r.why : '')).join('\n')))
+  }
+  if (recap.check_by_hand.length) parts.push(block(t, l.page_check, list(recap.check_by_hand)))
+  return frame(t, parts)
+}

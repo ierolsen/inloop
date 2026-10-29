@@ -90,6 +90,24 @@ page for each of the 20 most recent sessions and `index.html`, which lists them.
   the old ones too.
 - Narrow screens stack the tables into labelled rows; nothing but a diff scrolls sideways at 390 px.
 
+### The live view
+
+- The note tool's row and the recap tool's row in the transcript are drawn as cards
+  (`ui.render` on `ToolUse`), from the call's input alone, cleaned and redacted as the log is.
+  While Claude still streams the call, a card shows the fields that have arrived. A call that
+  failed keeps the engine's own row.
+- `/inloop pane` opens a pane with one note at a time and the diffs it explains. It follows the
+  newest note while Claude works; p and n step back and forth, l follows again, o writes and
+  opens the review page.
+- Diffs in the pane are drawn by the surface's own `Code` element (`format: 'diff'`). Its reader
+  refuses a hunk whose header counts lines that are not there, which is what a diff cut at its
+  line limit looks like, so every header is counted again from its lines and a leaf stays under
+  10,000 characters.
+- The pane is redrawn only while it is open, and its steps are worked out again only when a
+  record was added.
+- `claude plugin test` mounts the cards and the pane on all four surfaces (terminal, desktop,
+  VS Code, mobile), since `-p` draws nothing.
+
 ## Checks on Claude Code 2.1.310 (29 Oct 2026)
 
 A throwaway mod and `claude -p --plugin-dir` runs in a scratch git repository showed:

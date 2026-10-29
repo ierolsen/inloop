@@ -12,6 +12,8 @@ import { labels, hasLabels, say, count, nameOf, shownIn } from './i18n/index.ts'
 import type { Labels } from './i18n/en.ts'
 import { build, titleOf } from './review/model.ts'
 import { fit, sessions as sessionList, type SessionRow } from './review/render.ts'
+import { noteCard, recapCard } from './live/card.ts'
+import { steps, paneView, shown, type Step } from './live/pane.ts'
 
 const PLUGIN = 'inloop'
 const VERSION = '0.1.0'
@@ -19,6 +21,7 @@ const SECTION = PLUGIN + ':instructions'
 const READ_MAX = 1_000_000 // bytes of a file read for a diff; larger files are logged without one
 const DIFF_LINES = 400
 const SESSIONS_MAX = 20 // sessions on the list /inloop open all writes
+const PANE = 'inloop' // the pane's id
 const NOTHING_OUTSIDE = '[[],0]' // fingerprint() of an empty list: where every baseline starts
 
 type Snapshot = { text: string; exists: boolean; skipped: Skipped | null }
@@ -48,6 +51,11 @@ let logged = new Set<string>() // files with an edit in this session's log
 let lastOutside = NOTHING_OUTSIDE
 let tally = { notes: 0, edits: 0, unexplained: 0, outside: 0 }
 let turnTally = { notes: 0, edits: 0, unexplained: 0 }
+let paneOpen = false
+let paneIndex: number | null = null // the step the pane shows; null follows the newest
+let revision = 0 // moves with every record, so the pane works out its steps again only then
+let paneCache: { revision: number; list: Step[] } = { revision: -1, list: [] }
+let numbers = new Map<string, number>() // a note's tool_use_id to its number, for its card
 
 function reset() {
   ready = false
@@ -72,6 +80,11 @@ function reset() {
   lastOutside = NOTHING_OUTSIDE
   tally = { notes: 0, edits: 0, unexplained: 0, outside: 0 }
   turnTally = { notes: 0, edits: 0, unexplained: 0 }
+  paneOpen = false
+  paneIndex = null
+  revision = 0
+  paneCache = { revision: -1, list: [] }
+  numbers = new Map()
 }
 
 const agentOf = (e: any): string | null => (typeof e.agentId === 'string' && e.agentId ? e.agentId : null)
@@ -107,6 +120,8 @@ async function append($: any, record: LogRecord) {
   }
   records.push(record)
   partSize += size
+  revision++
+  if (paneOpen) await redraw($)
   if (!stored && !recordsSomething(record)) return
   if (!stored) {
     await keepOutOfGit($)
@@ -330,6 +345,56 @@ async function start($: any) {
   ready = true
 }
 
+// ---- the live view ----------------------------------------------------------------------------
+
+// Draws the pane again after a change, while it is open
+async function redraw($: any) {
+  try {
+    await $.ui.invalidate('ui.render')
+  } catch {
+    // the pane catches up at its next drawing
+  }
+}
+
+function paneSteps(): Step[] {
+  if (paneCache.revision !== revision) paneCache = { revision, list: steps(build(records)) }
+  return paneCache.list
+}
+
+async function closePane($: any) {
+  paneOpen = false
+  try {
+    await $.ui.close({ id: PANE })
+  } catch {
+    // closed already
+  }
+}
+
+async function pageFromPane($: any, l: Labels) {
+  try {
+    await $.ui.toast(await openReview($, false, l))
+  } catch {
+    // /inloop open still writes the page
+  }
+}
+
+async function openPane($: any, l: Labels): Promise<string> {
+  paneIndex = null
+  try {
+    await $.ui.open({ id: PANE, title: 'inloop', focus: true, closeOnEscape: true })
+    const placed = ((await $.ui.panes()) as any[]).find((x) => x.id === PANE)
+    if (placed && placed.isPlaced === false) {
+      await closePane($)
+      return l.pane_no_room
+    }
+    paneOpen = true
+    return l.pane_opened
+  } catch {
+    paneOpen = false
+    return l.pane_no_room
+  }
+}
+
 const detailName = (l: Labels, value: string) => l[('detail_' + value) as 'detail_brief'] ?? value
 const sourceName = (l: Labels, source: string) => l[('source_' + source) as 'source_user']
 
@@ -447,8 +512,8 @@ export function register(on: any, pluginOptions: any) {
       await $.tool.register(RECAP_SPEC)
       await $.command.register({
         name: PLUGIN,
-        description: 'inloop: the language and detail of notes, what was recorded, on and off',
-        argumentHint: '[status | lang <language> | detail <level> | on | off | help]',
+        description: 'inloop: the review page, the pane, the language and detail of notes, on and off',
+        argumentHint: '[open | open all | pane | status | lang <language> | detail <level> | on | off | help]',
         immediate: true,
       })
     } catch (err) {
@@ -491,9 +556,11 @@ export function register(on: any, pluginOptions: any) {
     tally.notes += 1
     turnTally.notes += 1
     const id = String(e.tool_use_id ?? 'note-' + tally.notes)
+    const source = e.source === 'reconstructed' ? 'reconstructed' : 'live'
     pairing.addNote(agentOf(e) ?? 'main', id, clean.files.map((f) => relative(f, root)))
+    numbers.set(id, tally.notes)
     try {
-      await append($, { v: SCHEMA, kind: 'note', ts: now(), session, agent: agentOf(e), turn, id, n: tally.notes, source: e.source === 'reconstructed' ? 'reconstructed' : 'live', note: clean, problems })
+      await append($, { v: SCHEMA, kind: 'note', ts: now(), session, agent: agentOf(e), turn, id, n: tally.notes, source, note: clean, problems })
     } catch {
       // the note still pairs with the edits in this session
     }
@@ -510,6 +577,43 @@ export function register(on: any, pluginOptions: any) {
     }
     return { result: 'inloop: recap saved.' + (problems.length ? ' Missing: ' + problems.join(', ') + '.' : '') }
   }).catch(async () => ({ result: 'inloop: the recap could not be saved.' }))
+
+  // The note's and the recap's rows in the transcript, drawn as cards in the reader's language.
+  // A card is drawn from the call's input alone, cleaned and redacted as the log is.
+  on('ui.render', { component: 'ToolUse', props: { tool: ['mcp__inloop__note', 'mcp__inloop__recap'] } }, ($: any, e: any, next: any) => {
+    if (e.props.isErrored) return next(e)
+    const t = $.ui.resolve(e)
+    const l = labels(settings.language.code)
+    const input = e.props.input && typeof e.props.input === 'object' ? e.props.input : {}
+    if (e.props.tool === 'mcp__inloop__recap') return recapCard(t, redactDeep(cleanRecap(input).recap).value, l)
+    return noteCard(t, redactDeep(cleanNote(input).note).value, numbers.get(e.props.tool_use_id) ?? null, input.source === 'reconstructed', l)
+  }).catch(($: any, e: any, next: any) => next(e))
+
+  // The pane: one step at a time, following the newest until the person steps back.
+  on('ui.render', { component: 'Pane' }, ($: any, e: any, next: any) => {
+    if (e.requestId !== PANE) return next(e)
+    const t = $.ui.resolve(e)
+    const code = shownIn(settings.language.code)
+    const l = labels(code)
+    const list = paneSteps()
+    const go = (to: number | null) => {
+      paneIndex = to === null || to >= list.length - 1 ? null : Math.max(0, to)
+      void redraw($)
+    }
+    return paneView(t, list, paneIndex, l, code, {
+      prev: () => go(shown(list.length, paneIndex) - 1),
+      next: () => go(shown(list.length, paneIndex) + 1),
+      latest: () => go(null),
+      page: () => void pageFromPane($, l),
+      close: () => void closePane($),
+    })
+  }).catch(($: any, e: any, next: any) => next(e))
+
+  // The person closed the pane (Escape or its tab): stop drawing it.
+  on('ui.close', ($: any, e: any, next: any) => {
+    if (e.id === PANE) paneOpen = false
+    return next(e)
+  })
 
   // Every edit is captured around the tool call. Whatever happens, the call goes on: every path
   // below ends in next(e), and a capture that fails is skipped.
@@ -556,6 +660,7 @@ export function register(on: any, pluginOptions: any) {
     const [command = 'status', ...rest] = words.filter((w) => w !== '--project')
     const value = rest.join(' ')
     if (command === 'help') return { text: l.help }
+    if (command === 'pane') return { text: await openPane($, l) }
     if (command === 'open') {
       try {
         return { text: await openReview($, value === 'all', l) }
