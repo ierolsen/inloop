@@ -111,3 +111,16 @@ test('a pane that finds no room says so and stays closed', async ($, on) => {
   expect((await $.command.run(command('pane'))).text).toBe('The pane cannot open here; /inloop open shows the review page instead.')
   expect(w.panes.size).toBe(0)
 })
+
+test('an explanation of existing code is marked and never pairs with an edit', async ($, on) => {
+  const w = worldOf(on)
+  await $.session.start(START)
+  await $.turn.start({ text: 'explain util.py', turnId: 't1' })
+  await $.tool.call(note({ title: 'What util.py is for', files: ['util.py'], what: 'w', why: 'Likely a helper.', source: 'reconstructed' }))
+  await $.tool.call({ tool: 'Write', file_path: ROOT + '/util.py', content: 'x = 1\n' } as any)
+  const records = w.records()
+  expect(records.find((r) => r.kind === 'note').source).toBe('reconstructed')
+  expect(records.find((r) => r.kind === 'edit').note).toBe(null)
+  const ui = await $.ui.mount({ ...row('mcp__inloop__note', { title: 'What util.py is for', what: 'w', why: 'y', source: 'reconstructed' }), surface: 'terminal' } as any)
+  expect((await ui.find({ type: 'Text', text: /explained afterwards/ }))).toBeDefined()
+})

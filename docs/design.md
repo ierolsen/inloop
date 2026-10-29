@@ -108,6 +108,23 @@ page for each of the 20 most recent sessions and `index.html`, which lists them.
 - `claude plugin test` mounts the cards and the pane on all four surfaces (terminal, desktop,
   VS Code, mobile), since `-p` draws nothing.
 
+### Explaining code that already exists
+
+`/inloop:explain <target>` is a skill for code Claude did not just write: older code, a project
+someone else built, a commit range, or edits the page lists without a note. Claude reads the code
+and writes notes through the same `note` tool with `"source": "reconstructed"`, then a recap, and
+changes no file.
+
+- A reconstructed note never pairs with an edit: it explains code, it is not the reason for the
+  next change.
+- For code Claude did not write, the reason is usually an inference. The skill allows
+  `basis: verified` only when a commit message, a comment, a document or a test states the reason,
+  and asks Claude to name that source; otherwise the note says the reason is likely.
+- The skill runs only when the person calls it (`disable-model-invocation: true`), so a plain
+  question about the code does not fill the log.
+- It writes in the language the inloop instructions name, and falls back to the plugin's
+  `language` setting when inloop is off.
+
 ## Checks on Claude Code 2.1.310 (29 Oct 2026)
 
 A throwaway mod and `claude -p --plugin-dir` runs in a scratch git repository showed:
@@ -121,6 +138,10 @@ A throwaway mod and `claude -p --plugin-dir` runs in a scratch git repository sh
 | Reading the file before a Write that creates it | Empty, as expected |
 | `register(on, options)` | `options` holds the `userConfig` values with defaults filled in |
 | Type declarations | Written into `.claude-plugin/types/` only in interactive sessions. The reference copy is `mods/types/claude-code.d.ts` in the anthropics/claude-code repository |
+
+`claude -p "/inloop:explain shapes.py"` in a scratch repository set to Turkish wrote three Turkish notes
+marked `reconstructed`, each reason worded as an inference with the missing evidence named, callers
+with line numbers, and a recap; no file changed.
 
 `claude -p "/inloop open all"` runs the command: the reply comes in the project's language, and as
 the session is not interactive no browser is started.

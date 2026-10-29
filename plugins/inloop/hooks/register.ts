@@ -557,7 +557,8 @@ export function register(on: any, pluginOptions: any) {
     turnTally.notes += 1
     const id = String(e.tool_use_id ?? 'note-' + tally.notes)
     const source = e.source === 'reconstructed' ? 'reconstructed' : 'live'
-    pairing.addNote(agentOf(e) ?? 'main', id, clean.files.map((f) => relative(f, root)))
+    // an explanation of code that already exists is not the reason for the next edit
+    if (source === 'live') pairing.addNote(agentOf(e) ?? 'main', id, clean.files.map((f) => relative(f, root)))
     numbers.set(id, tally.notes)
     try {
       await append($, { v: SCHEMA, kind: 'note', ts: now(), session, agent: agentOf(e), turn, id, n: tally.notes, source, note: clean, problems })

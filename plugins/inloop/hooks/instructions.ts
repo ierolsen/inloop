@@ -70,6 +70,7 @@ export const NOTE_SPEC = {
         required: ['name', 'kind', 'why_exists'],
       }),
       risks: list('What the user should check by hand after this change.', { type: 'string' }),
+      source: { type: 'string', enum: ['live', 'reconstructed'], description: '"reconstructed" when the note explains code that already exists (as /inloop:explain asks) rather than a change you are about to make. Leave it out otherwise.' },
     },
     required: ['title', 'files', 'what', 'why'],
   },
