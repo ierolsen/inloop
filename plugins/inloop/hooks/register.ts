@@ -6,15 +6,19 @@ import { instructions, NOTE_SPEC, RECAP_SPEC } from './instructions.ts'
 import { cleanNote, cleanRecap, relative, inside, Pairing } from './note.ts'
 import { diff, isBinary } from './diff.ts'
 import { redact, redactDeep, sensitive } from './redact.ts'
-import { SCHEMA, DIR, CONFIG, PART_BYTES, line, parse, partPath, bytes, type LogRecord, type OutsideEntry, type Skipped } from './log.ts'
+import { SCHEMA, DIR, LOG_DIR, REVIEW_DIR, CONFIG, PART_BYTES, line, parse, partPath, bytes, sessionsOf, type LogRecord, type OutsideEntry, type Skipped } from './log.ts'
 import { nul, porcelain, unaccounted, state, hunks, counts, inloopOwn, OUTSIDE_MAX } from './outside.ts'
-import { labels, hasLabels, say, count } from './i18n/index.ts'
+import { labels, hasLabels, say, count, nameOf, shownIn } from './i18n/index.ts'
+import type { Labels } from './i18n/en.ts'
+import { build, titleOf } from './review/model.ts'
+import { fit, sessions as sessionList, type SessionRow } from './review/render.ts'
 
 const PLUGIN = 'inloop'
 const VERSION = '0.1.0'
 const SECTION = PLUGIN + ':instructions'
 const READ_MAX = 1_000_000 // bytes of a file read for a diff; larger files are logged without one
 const DIFF_LINES = 400
+const SESSIONS_MAX = 20 // sessions on the list /inloop open all writes
 const NOTHING_OUTSIDE = '[[],0]' // fingerprint() of an empty list: where every baseline starts
 
 type Snapshot = { text: string; exists: boolean; skipped: Skipped | null }
@@ -24,6 +28,7 @@ type Snapshot = { text: string; exists: boolean; skipped: Skipped | null }
 let options: Record<string, unknown> = {}
 let ready = false
 let enabled = true
+let interactive = true // a person at a screen, who can be shown a page
 let session = ''
 let root = ''
 let settings: Settings = resolve({})
@@ -45,6 +50,7 @@ let turnTally = { notes: 0, edits: 0, unexplained: 0 }
 function reset() {
   ready = false
   enabled = true
+  interactive = true
   session = ''
   root = ''
   settings = resolve({})
@@ -301,13 +307,100 @@ async function start($: any) {
   ready = true
 }
 
+const detailName = (l: Labels, value: string) => l[('detail_' + value) as 'detail_brief'] ?? value
+const sourceName = (l: Labels, source: string) => l[('source_' + source) as 'source_user']
+
+// ---- the review page --------------------------------------------------------------------------
+
+// Every part of one session's log, in order
+async function readSession($: any, id: string): Promise<LogRecord[]> {
+  const out: LogRecord[] = []
+  for (let p = 1; p < 1000; p++) {
+    const path = partPath(root, id, p)
+    if (!(await $.fs.exists(path))) break
+    out.push(...parse(await $.fs.read(path)))
+  }
+  return out
+}
+
+async function mtime($: any, path: string): Promise<number> {
+  try {
+    return (await $.fs.stat(path)).mtimeMs
+  } catch {
+    return 0
+  }
+}
+
+// Writes the review page of one session from its log. Pages are written again each time, so a
+// newer inloop or another language redraws the old ones too.
+async function writePage($: any, id: string, back: boolean) {
+  const code = shownIn(settings.language.code)
+  const l = labels(code)
+  const page = build(await readSession($, id))
+  const path = root + '/' + REVIEW_DIR + '/' + id + '.html'
+  const { html, trimmed } = fit(page, l, { code, log: LOG_DIR + '/' + id + '.jsonl', back: back ? 'index.html' : undefined })
+  await $.fs.write(path, html)
+  return { path, page, trimmed }
+}
+
+// Opens a page in the browser, where a person can see one. False when it could not.
+async function show($: any, path: string): Promise<boolean> {
+  if (!interactive) return false
+  let argv = ['xdg-open', path]
+  if (/^[A-Za-z]:\//.test(path)) argv = ['cmd', '/c', 'start', '', path.replace(/\//g, '\\')]
+  else {
+    try {
+      if ((await $.process.run(['uname', '-s'], { cwd: root, timeoutMs: 5000 })).stdout.trim() === 'Darwin') argv = ['open', path]
+    } catch {
+      // no uname: try xdg-open
+    }
+  }
+  try {
+    return (await $.process.run(argv, { cwd: root, timeoutMs: 15000 })).exitCode === 0
+  } catch {
+    return false
+  }
+}
+
+async function openReview($: any, all: boolean, l: Labels): Promise<string> {
+  await writing
+  try {
+    await checkOutside($)
+  } catch {
+    // the page shows the last check
+  }
+  if (!all) {
+    const { path, trimmed } = await writePage($, session, false)
+    return say((await show($, path)) ? l.open_opened : l.open_written, { path }) + (trimmed ? '\n' + l.open_trimmed : '')
+  }
+  let names: string[] = []
+  try {
+    names = (await $.fs.list(root + '/' + LOG_DIR)).filter((x: any) => x.kind === 'file').map((x: any) => x.name)
+  } catch {
+    names = []
+  }
+  const found: { id: string; changed: number }[] = []
+  for (const [id, parts] of sessionsOf(names)) found.push({ id, changed: await mtime($, root + '/' + LOG_DIR + '/' + parts[parts.length - 1]) })
+  found.sort((a, b) => b.changed - a.changed)
+  const rows: SessionRow[] = []
+  for (const { id } of found.slice(0, SESSIONS_MAX)) {
+    const { page } = await writePage($, id, true)
+    rows.push({ href: id + '.html', started: page.started, title: titleOf(page), notes: page.counts.notes, edits: page.counts.edits, unexplained: page.counts.unexplained })
+  }
+  const code = shownIn(settings.language.code)
+  const project = root.split('/').pop() || root
+  const path = root + '/' + REVIEW_DIR + '/index.html'
+  await $.fs.write(path, sessionList(project, rows, Math.max(0, found.length - SESSIONS_MAX), labels(code), code, VERSION))
+  return say((await show($, path)) ? l.open_all_opened : l.open_all_written, { path })
+}
+
 function statusText(): string {
   const code = settings.language.code
   const l = labels(code)
   return say(l.status, {
     state: enabled ? l.state_on : l.state_off,
-    language: languageName(settings.language), language_source: l[('source_' + settings.language.source) as 'source_user'],
-    detail: settings.detail.value, detail_source: l[('source_' + settings.detail.source) as 'source_user'],
+    language: nameOf(settings.language, code), language_source: sourceName(l, settings.language.source),
+    detail: detailName(l, settings.detail.value), detail_source: sourceName(l, settings.detail.source),
     notes: count(code, l.notes, tally.notes), edits: count(code, l.edits, tally.edits),
     unexplained: tally.unexplained, files: count(code, l.files, tally.outside),
     log: partPath(root, session, part),
@@ -319,6 +412,7 @@ export function register(on: any, pluginOptions: any) {
   options = pluginOptions && typeof pluginOptions === 'object' ? pluginOptions : {}
 
   on('session.start', async ($: any, e: any, next: any) => {
+    interactive = e.isInteractive !== false
     try {
       await start($)
       await $.tool.register(NOTE_SPEC)
@@ -434,6 +528,13 @@ export function register(on: any, pluginOptions: any) {
     const [command = 'status', ...rest] = words.filter((w) => w !== '--project')
     const value = rest.join(' ')
     if (command === 'help') return { text: l.help }
+    if (command === 'open') {
+      try {
+        return { text: await openReview($, value === 'all', l) }
+      } catch (err) {
+        return { text: say(l.open_failed, { error: String(err) }) }
+      }
+    }
     if (command === 'status') return { text: statusText() }
     if (command === 'on' || command === 'off') {
       enabled = command === 'on'
@@ -450,28 +551,29 @@ export function register(on: any, pluginOptions: any) {
         if (!project) await setSetting($, 'language', null, false)
         await setSetting($, 'language', null, true)
         const after = labels(settings.language.code)
-        return { text: say(after.lang_reset, { language: languageName(settings.language), source: after[('source_' + settings.language.source) as 'source_user'] }) }
+        return { text: say(after.lang_reset, { language: nameOf(settings.language, settings.language.code), source: sourceName(after, settings.language.source) }) }
       }
       const lang = parseLanguage(value)
       if (!lang) return { text: l.lang_missing }
       await setSetting($, 'language', lang.code ?? lang.english, project)
       const after = labels(settings.language.code)
-      const said = [say(project ? after.lang_project : after.lang_user, { language: languageName(lang) })]
-      if (!project && settings.language.source === 'project') said.push(say(after.lang_project_wins, { language: languageName(settings.language) }))
-      if (!hasLabels(lang.code)) said.push(say(after.lang_no_labels, { language: languageName(lang) }))
+      const ui = settings.language.code
+      const said = [say(project ? after.lang_project : after.lang_user, { language: nameOf(lang, ui) })]
+      if (!project && settings.language.source === 'project') said.push(say(after.lang_project_wins, { language: nameOf(settings.language, ui) }))
+      if (!hasLabels(lang.code)) said.push(say(after.lang_no_labels, { language: nameOf(lang, ui) }))
       return { text: said.join('\n') }
     }
     if (command === 'detail') {
       if (value === 'reset') {
         if (!project) await setSetting($, 'detail', null, false)
         await setSetting($, 'detail', null, true)
-        return { text: say(l.detail_reset, { detail: settings.detail.value, source: l[('source_' + settings.detail.source) as 'source_user'] }) }
+        return { text: say(l.detail_reset, { detail: detailName(l, settings.detail.value), source: sourceName(l, settings.detail.source) }) }
       }
       const level = parseDetail(value)
       if (!level) return { text: l.detail_bad }
       await setSetting($, 'detail', level, project)
-      const said = [say(project ? l.detail_project : l.detail_user, { detail: level })]
-      if (!project && settings.detail.source === 'project') said.push(say(l.detail_project_wins, { detail: settings.detail.value }))
+      const said = [say(project ? l.detail_project : l.detail_user, { detail: detailName(l, level) })]
+      if (!project && settings.detail.source === 'project') said.push(say(l.detail_project_wins, { detail: detailName(l, settings.detail.value) }))
       return { text: said.join('\n') }
     }
     return { text: say(l.unknown, { command }) + '\n' + l.help }

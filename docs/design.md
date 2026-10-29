@@ -61,6 +61,29 @@ The language is taken from the first of these that is set:
 Names and codes are both accepted. Page labels exist for `en`, `tr`, `de` and `nl`. Other languages
 get English labels, while Claude still writes the notes in them.
 
+### The review page
+
+`/inloop open` writes `.inloop/review/<session>.html` from the session's log. In an interactive
+session it opens the page in the browser (`open` on macOS, `xdg-open` elsewhere, `cmd /c start`
+on Windows); otherwise, and whenever that fails, it prints the path. `/inloop open all` writes a
+page for each of the 20 most recent sessions and `index.html`, which lists them.
+
+- A session splits into tasks at each recap on the main loop. A subagent's recap shows inside the
+  task it belongs to. The work after the last recap is read in a fixed order: data and types,
+  logic, interface, tests, configuration, documentation, other; within a role, in the order the
+  files first changed.
+- Edits stay with the note they were paired with when they were made. A file changed outside the
+  edit tools goes under the latest note that names it, which is usually the note Claude writes
+  before a shell command; otherwise it is listed in a section of its own.
+- The page is one file: inline CSS and a few lines of script that fold the diffs. It reads the
+  same without the script. Everything taken from the log is escaped, and a Content-Security-Policy
+  meta tag stops the page from loading anything.
+- `$.fs.write` takes 4 MiB, so a page over 3.8 MB leaves out its largest diffs first, then its
+  oldest tasks, and says so on the page.
+- Pages are drawn again on every `/inloop open`, so a newer inloop or another language redraws
+  the old ones too.
+- Narrow screens stack the tables into labelled rows; nothing but a diff scrolls sideways at 390 px.
+
 ## Checks on Claude Code 2.1.310 (29 Oct 2026)
 
 A throwaway mod and `claude -p --plugin-dir` runs in a scratch git repository showed:
@@ -75,8 +98,11 @@ A throwaway mod and `claude -p --plugin-dir` runs in a scratch git repository sh
 | `register(on, options)` | `options` holds the `userConfig` values with defaults filled in |
 | Type declarations | Written into `.claude-plugin/types/` only in interactive sessions. The reference copy is `mods/types/claude-code.d.ts` in the anthropics/claude-code repository |
 
-Not covered by `-p`, so tested with `claude plugin test` and by hand: the live card, the pane, and
-the `/inloop` command's output in the terminal.
+`claude -p "/inloop open all"` runs the command: the reply comes in the project's language, and as
+the session is not interactive no browser is started.
+
+Not covered by `-p`, so tested with `claude plugin test` and by hand: the live card, the pane, the
+line under an answer, and the `/inloop` command's output in the terminal.
 
 ## Limits that shape the code
 

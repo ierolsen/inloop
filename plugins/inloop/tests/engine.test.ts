@@ -37,11 +37,11 @@ test('edits pair with the note before them; after a new prompt, an edit with no 
   // a subagent's note pairs with that subagent's edits only
   await $.tool.call(note({ tool_use_id: 'n2', agentId: 'sub-1', title: 'Tidy util', files: ['util.py'], what: 'w', why: 'y' }))
   await $.tool.call({ tool: 'Edit', tool_use_id: 'e2', agentId: 'sub-1', file_path: ROOT + '/util.py', old_string: 'x = 2', new_string: 'x = 3' } as any)
-  expect((await $.turn.complete(turnDone('t1'))).text).toBe('inloop: 2 notes, 3 edits.')
+  expect((await $.turn.complete(turnDone('t1'))).text).toBe('inloop: 2 notes, 3 edits. /inloop open shows them.')
 
   await $.turn.start({ text: 'say hello instead', turnId: 't2' })
   await $.tool.call({ tool: 'Edit', tool_use_id: 'e3', file_path: ROOT + '/greet.py', old_string: 'hi', new_string: 'hello' } as any)
-  expect((await $.turn.complete(turnDone('t2'))).text).toBe('inloop: 0 notes, 1 edit, 1 without a note.')
+  expect((await $.turn.complete(turnDone('t2'))).text).toBe('inloop: 0 notes, 1 edit, 1 without a note. /inloop open shows them.')
 
   expect(edits(w).map((r) => [r.id, r.note, r.listed, r.agent, r.turn])).toEqual([
     ['w1', 'n1', true, null, 't1'],
@@ -115,6 +115,11 @@ test('/inloop lang and detail change the next instructions, for all projects or 
   // the plugin's own setting (its default, English, as /config shows it) is what reset goes back to
   expect((await $.command.run(command('lang reset'))).text).toBe('inloop notes are in English again (the plugin setting).')
   expect((await $.command.run(command('lang'))).text).toBe('Name a language, as in /inloop lang Turkish or /inloop lang de.')
+  // a language with no labels: the notes are in it, inloop's own messages stay English
+  expect((await $.command.run(command('lang Japanese'))).text).toBe('From now on inloop notes are in Japanese (日本語), in all your projects.\n' +
+    'inloop has no labels in Japanese (日本語) yet, so its own messages stay in English; the notes themselves are in Japanese (日本語).')
+  expect(await written()).toContain('Japanese (日本語)')
+  await $.command.run(command('lang reset'))
 
   expect(await written()).not.toContain('never guess a URL')
   expect((await $.command.run(command('detail deep'))).text).toBe('From now on inloop notes are deep, in all your projects.')
@@ -165,7 +170,7 @@ test('files changed outside the edit tools are listed when the turn ends, once',
     ['git diff --name-only --diff-filter=D -z ' + HEAD]: '',
     ['git diff --no-color --no-ext-diff ' + HEAD + ' -- run.sh']: 'diff --git a/run.sh b/run.sh\nindex 1..2 100644\n--- a/run.sh\n+++ b/run.sh\n@@ -1 +1 @@\n-echo old\n+echo new\n',
   })
-  expect((await $.turn.complete(turnDone('t1'))).text).toBe('inloop: 1 note, 1 edit, 2 files changed outside the edit tools.')
+  expect((await $.turn.complete(turnDone('t1'))).text).toBe('inloop: 1 note, 1 edit, 2 files changed outside the edit tools. /inloop open shows them.')
   const outside = w.records().filter((r) => r.kind === 'outside')
   expect(outside).toHaveLength(1)
   expect(outside[0].more).toBe(0)
@@ -242,4 +247,51 @@ test('files outside the project and inloop\'s own files are not recorded as edit
   expect(w.files.get('/home/me/.claude/plans/plan.md')).toBe('# Plan\n')
   expect(edits(w)).toEqual([])
   expect((await $.turn.complete(turnDone('t1'))).text).toBe('Done.')
+})
+
+test('/inloop open writes the review page and says where it is', async ($, on) => {
+  const w = worldOf(on, { store: { settings: { language: 'tr' } } })
+  await $.session.start(START)
+  await $.turn.start({ text: 'greet', turnId: 't1' })
+  await $.tool.call(note({ title: 'Selamlama fonksiyonu', files: ['greet.py'], what: 'Ekler.', why: 'CLI istiyor.' }))
+  await $.tool.call({ tool: 'Write', file_path: ROOT + '/greet.py', content: 'def greet():\n    pass\n' } as any)
+  const page = ROOT + '/.inloop/review/' + SESSION_ID + '.html'
+  // no browser could be opened here, so the path is the answer
+  expect((await $.command.run(command('open'))).text).toBe('The review page is at ' + page)
+  const html = w.files.get(page) ?? ''
+  expect(html).toContain('<html lang="en">')
+  expect(html).toContain('Selamlama fonksiyonu')
+  expect(html).toContain('<td class="m">+</td><td class="c">def greet():</td>')
+  expect(html).toContain('.inloop/log/' + SESSION_ID + '.jsonl')
+  expect(html).not.toContain(ROOT + '/.inloop/log') // the footer names the log without the absolute path
+})
+
+test('/inloop open shows the page in the browser where it can', async ($, on) => {
+  const page = ROOT + '/.inloop/review/' + SESSION_ID + '.html'
+  const w = worldOf(on, { git: { 'uname -s': 'Darwin\n', ['open ' + page]: '' } })
+  await $.session.start(START)
+  expect((await $.command.run(command('open'))).text).toBe('Opened the review page: ' + page)
+  expect(w.ran).toContain('open ' + page)
+})
+
+test('a session with no person at the screen never starts a browser', async ($, on) => {
+  const w = worldOf(on, { git: { 'uname -s': 'Darwin\n' } })
+  await $.session.start({ ...START, isInteractive: false })
+  expect((await $.command.run(command('open'))).text).toStartWith('The review page is at ')
+  expect(w.ran.filter((c) => !c.startsWith('git '))).toEqual([])
+})
+
+test('/inloop open all writes a page for each session and a list of them', async ($, on) => {
+  const old = [
+    { v: 1, kind: 'session', ts: 1, session: 'old-1', agent: null, turn: null, root: ROOT, language: 'English', language_code: 'en', detail: 'standard', version: '0.1.0' },
+    { v: 1, kind: 'note', ts: 2, session: 'old-1', agent: null, turn: 't1', id: 'n1', n: 1, source: 'live', problems: [], note: { title: 'Set up the project', files: ['a.py'], what: 'w', why: 'y', basis: null, alternatives: [], parameters: [], symbols: [], risks: [] } },
+  ]
+  const w = worldOf(on, { files: { [ROOT + '/.inloop/log/old-1.jsonl']: old.map((r) => JSON.stringify(r) + '\n').join('') } })
+  await $.session.start(START)
+  const list = ROOT + '/.inloop/review/index.html'
+  expect((await $.command.run(command('open all'))).text).toBe('The list of sessions is at ' + list)
+  const html = w.files.get(list) ?? ''
+  expect(html).toContain('<a href="old-1.html">Set up the project</a>')
+  expect(html).toContain('<a href="' + SESSION_ID + '.html">Session without notes</a>')
+  expect(w.files.get(ROOT + '/.inloop/review/old-1.html')).toContain('href="index.html"')
 })

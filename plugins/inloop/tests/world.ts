@@ -9,7 +9,7 @@ export const LOG = ROOT + '/.inloop/log/' + SESSION_ID + '.jsonl'
 export const START = { cwd: ROOT, surface: 'terminal', isInteractive: true } as const
 export const COMPOSE = { model: 'claude-opus-5-5', promptModel: 'claude-opus-5-5', surfaces: ['terminal'], tools: [], outputStyle: null, traits: [] } as const
 
-// A git command line, as inloop runs it, to what it prints; a line not listed fails.
+// A command line inloop runs (git, uname, open), to what it prints; a line not listed fails.
 export type Git = Record<string, string>
 
 export type World = {
@@ -21,6 +21,7 @@ export type World = {
   git: Git | null
   broken: { fs: boolean }
   refused: Set<string> // paths whose edits the person refuses
+  ran: string[] // command lines inloop ran, git's and others'
   // the log of this session as inloop wrote it, line by line
   records: () => any[]
 }
@@ -35,6 +36,7 @@ export function worldOf(on: On, given: { files?: Record<string, string>; git?: G
     git: given.git ?? null,
     broken: { fs: false },
     refused: new Set(),
+    ran: [],
     records: () => (world.files.get(LOG) ?? '').split('\n').filter(Boolean).map((l) => JSON.parse(l)),
   }
   const files = world.files
@@ -55,8 +57,15 @@ export function worldOf(on: On, given: { files?: Record<string, string>; git?: G
     return { value: { kind: 'file', size: (files.get(e.path) ?? '').length, mtimeMs: 0, isLink: false } }
   })
   mock.store(on, given.store ?? {})
+  on('fs.list', ($: any, e: any) => {
+    fs()
+    const dir = String(e.path).replace(/\/+$/, '') + '/'
+    const names = [...files.keys()].filter((k) => k.startsWith(dir) && !k.slice(dir.length).includes('/')).map((k) => k.slice(dir.length))
+    return { value: names.sort().map((name) => ({ name, kind: 'file', size: (files.get(dir + name) ?? '').length, isLink: false })) }
+  })
   on('process.run', ($: any, e: any) => {
     const command = e.argv.join(' ')
+    world.ran.push(command)
     const out = world.git ? world.git[command] : undefined
     return { value: out === undefined ? { exitCode: 128, stdout: '', stderr: 'fatal: ' + command } : { exitCode: 0, stdout: out, stderr: '' } }
   })
