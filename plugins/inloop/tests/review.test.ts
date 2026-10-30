@@ -261,7 +261,7 @@ test('the explorer: a tree of files, each with its code, its changes and why eac
   expect(en).toContain('<html lang="en" data-theme="dark" data-fixed data-level="big-picture" data-start="' + fileId('app.py') + '">')
   expect(en).toContain('body:not(:has(:target)) #' + fileId('app.py') + ' { display: block; }')
   for (const word of ['Explain: the code as it stands', 'Commit 1 of 4', '2 older commits in this range are not shown.', 'not in this review', 'Go to file']) expect(en, word).toContain(word)
-  expect(html + en).not.toContain('—')
+  expect(html + en).not.toContain('\u2014')
   // a start that is not on the page falls back to the overview
   expect(render(r, x, labels('en'), { ...OPTIONS, start: 'f-nowhere' })).toContain('data-start="overview"')
 })
