@@ -11,7 +11,14 @@ says what is recorded, where it stays, and what never leaves your computer.
   went into them.
 - **Files changed outside the edit tools** since the session began (for example by a shell
   command), found through `git status` and `git diff`, with their diffs.
-- **The session's settings**: the language and form of the notes and the plugin version.
+- **The session's settings**: the project's folder, the language and form of the notes and the
+  plugin version.
+
+Notes and diffs are copies of your code changes, so if your code holds personal data such as
+names or e-mail addresses, the record does too. Commit authors' names, which git gives with each
+commit, are read to build a page but not recorded or shown. `/inloop review pr` and
+`/inloop share pr` read your GitHub login only to find inloop's earlier comment; it is not
+recorded.
 
 ## Where it stays
 

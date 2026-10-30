@@ -20,6 +20,23 @@ In Claude Code:
 inloop is a Claude Code plugin built as a mod (a hooks module). It works in Claude Code 2.1.287
 or later, in the terminal and the desktop app; it does not load on claude.ai or in Cowork.
 
+## Examples
+
+1. **Follow a change while Claude makes it.** Ask Claude, for example: "Add an
+   `income_per_room` feature to `housing/features.py`, with a test." Before each edit a note
+   card appears in the transcript: what the change does, why, and why the new function exists.
+   When the task is done, `/inloop review` opens the work in your browser, each explanation
+   beside the line it explains.
+2. **Review a pull request.** `/inloop review pr 12` fetches pull request 12 and opens it commit
+   by commit. `/inloop share pr 12` shows the comment it would post; `/inloop share pr 12 --yes`
+   posts it through your own `gh` login.
+3. **Learn a codebase you just joined.** `/inloop:onboard` has Claude read the project without
+   changing it and write a tour: the main flows, the files to read in order, setup, conventions,
+   questions to check your understanding and first tasks. `/inloop explain` opens it.
+4. **Understand code you did not watch being written.** `/inloop:annotate housing/model.py`
+   explains an existing file; `/inloop explain housing/model.py` shows the explanations beside
+   the code.
+
 ## Commands
 
 | Command | What it does |
@@ -38,6 +55,9 @@ or later, in the terminal and the desktop app; it does not load on claude.ai or 
 ## What inloop does on your computer
 
 ### Files it writes
+
+Notes and diffs are copies of your code changes, so if your code holds personal data such as
+names or e-mail addresses, the copies do too. They stay on your computer.
 
 Only inside `.inloop/` in your project: the session logs (`.inloop/log/`), the review pages
 (`.inloop/review/`), what you share (`.inloop/share/`), the project's own settings
