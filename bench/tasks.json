@@ -1,0 +1,55 @@
+{
+  "fixtures": {
+    "house-prices": {
+      "description": "A small Python machine learning project (about 250 lines): California house prices with pandas and scikit-learn, pytest tests.",
+      "check": [
+        ".venv/bin/pytest",
+        "-q"
+      ]
+    }
+  },
+  "tools": [
+    "Bash(git add:*)",
+    "Bash(git commit:*)",
+    "Bash(git rm:*)",
+    "Bash(git status:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(.venv/bin/python:*)",
+    "Bash(.venv/bin/pytest:*)",
+    "Bash(rm -f models/model.joblib)"
+  ],
+  "tasks": [
+    {
+      "id": "add-feature",
+      "kind": "adds code",
+      "fixture": "house-prices",
+      "prompt": "Add an income_per_room feature to housing/features.py: MedInc divided by AveRooms, 0 where AveRooms is 0. Include it in add_features and add a pytest test for it. Run the tests with .venv/bin/pytest. Make one git commit with a conventional commit message in English. Keep your final answer short."
+    },
+    {
+      "id": "fix-bug",
+      "kind": "debugging",
+      "fixture": "house-prices",
+      "setup": [
+        [
+          "python3",
+          "-c",
+          "import pathlib; p = pathlib.Path('housing/features.py'); s = p.read_text(); p.write_text(s.replace('_safe_divide(df[\"AveBedrms\"], df[\"AveRooms\"])', '_safe_divide(df[\"AveRooms\"], df[\"AveBedrms\"])', 1))"
+        ]
+      ],
+      "prompt": "The tests fail. Find the cause and fix it without changing what the tests check. Run the tests with .venv/bin/pytest. Make one git commit with a conventional commit message in English. Keep your final answer short."
+    },
+    {
+      "id": "prune-features",
+      "kind": "measures; removes code only when a feature does not help",
+      "fixture": "house-prices",
+      "prompt": "Measure the test MAE with each derived feature in housing/features.py left out in turn (with .venv/bin/python; one random seed is enough). Remove the features that do not help, with their tests and every use of them, and keep at least one. The saved model in models/ is stale after this: delete it with rm -f models/model.joblib. Run the tests with .venv/bin/pytest. Make one git commit with a conventional commit message in English. Keep your final answer short."
+    },
+    {
+      "id": "remove-feature",
+      "kind": "removes code",
+      "fixture": "house-prices",
+      "prompt": "Remove the households feature from housing/features.py, with its test and every use of it. Run the tests with .venv/bin/pytest. Make one git commit with a conventional commit message in English. Keep your final answer short."
+    }
+  ]
+}
