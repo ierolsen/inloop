@@ -503,8 +503,8 @@ async function recordedCommits($: any, all: LogRecord[]): Promise<{ commits: Git
 async function pendingFiles($: any): Promise<FileData[]> {
   const hasHead = (await gitRun($, ['git', 'rev-parse', '--verify', '--quiet', 'HEAD'])).ok
   const out = await gitFiles($, ['diff', '--no-color', '--no-ext-diff', ...(hasHead ? ['HEAD'] : ['--cached'])])
-  const fresh = nul((await gitRun($, ['git', 'ls-files', '--others', '--exclude-standard', '-z'])).out).filter((p) => !inloopOwn(p))
-  for (const path of fresh.slice(0, UNTRACKED_MAX)) {
+  const untracked = nul((await gitRun($, ['git', 'ls-files', '--others', '--exclude-standard', '-z'])).out).filter((p) => !inloopOwn(p))
+  for (const path of untracked.slice(0, UNTRACKED_MAX)) {
     const empty = added(path, '')
     if (sensitive(path)) { out.push({ patch: empty, redactions: 0, hidden: 'sensitive', cut: false }); continue }
     const snap = await snapshot($, root + '/' + path)
@@ -841,17 +841,18 @@ async function chooseShare($: any, what: string, theme: Theme, origin: string, l
 const BROWSERS = new Set(['com.apple.safari', 'com.google.chrome', 'com.google.chrome.canary', 'org.mozilla.firefox', 'com.microsoft.edgemac',
   'company.thebrowser.browser', 'com.brave.browser', 'com.operasoftware.opera', 'com.vivaldi.vivaldi', 'org.chromium.chromium', 'app.zen-browser.zen'])
 
-// The app that opens mailto: links on this Mac, from Launch Services; Apple Mail when none is chosen
+// The app that opens mailto: links on this Mac, as macOS's Launch Services resolves it (AppleScript
+// with AppKit, every argument fixed); Apple Mail when it names none
 async function mailApp($: any): Promise<string> {
   try {
-    const home = String((await $.env.get('HOME')) ?? '')
-    const plist = home + '/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist'
-    const r = await $.process.run(['plutil', '-convert', 'json', '-o', '-', plist], { cwd: root, timeoutMs: 5000 })
-    const handlers = r.exitCode === 0 ? JSON.parse(r.stdout).LSHandlers : []
-    const mailto = Array.isArray(handlers) ? handlers.find((h: any) => h?.LSHandlerURLScheme === 'mailto') : null
-    if (typeof mailto?.LSHandlerRoleAll === 'string' && mailto.LSHandlerRoleAll !== '-') return mailto.LSHandlerRoleAll
+    const r = await $.process.run(['osascript', '-e', 'use framework "AppKit"', '-e', 'use scripting additions',
+      '-e', 'set u to current application\'s NSWorkspace\'s sharedWorkspace()\'s URLForApplicationToOpenURL:(current application\'s NSURL\'s URLWithString:"mailto:")',
+      '-e', 'if u is missing value then return ""',
+      '-e', 'return ((current application\'s NSBundle\'s bundleWithURL:u)\'s bundleIdentifier()) as text'], { cwd: root, timeoutMs: 5000 })
+    const app = r.exitCode === 0 ? r.stdout.trim() : ''
+    if (/^[\w.-]+$/.test(app)) return app
   } catch {
-    // no preferences to read: the system's choice
+    // no answer: the system's choice
   }
   return 'com.apple.mail'
 }

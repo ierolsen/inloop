@@ -18,7 +18,7 @@ export const COMMENT_MAX = 60_000 // characters; GitHub takes up to 65,536 in a 
 // gets an invisible joiner so GitHub does not take it for a mention.
 export function md(text: unknown): string {
   return String(text ?? '').replace(/\r\n/g, '\n').split(/(`[^`\n]*`)/).map((part, i) => (i % 2 ? part : part
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/@(?=[\w-])/g, '@⁠'))).join('').trim()
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/@(?=[\w-])/g, '@\u2060'))).join('').trim()
 }
 // One line: paragraphs and bullets folded into it
 const line = (text: unknown) => md(text).replace(/\s*\n+\s*/g, ' ')

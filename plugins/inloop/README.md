@@ -35,21 +35,63 @@ or later, in the terminal and the desktop app; it does not load on claude.ai or 
 | `/inloop:annotate <target>` | Claude explains code that already exists |
 | `/inloop:onboard [folder]` | Claude walks someone new through the codebase |
 
-## What it runs and what it sends
+## What inloop does on your computer
 
-- It records notes, edits and recaps in `.inloop/` in your project, which keeps itself out of
-  git with its own `.gitignore`. Secrets are redacted before anything is written.
-- It runs `git` to read commits and diffs, and `gh` only for the pull request commands. The only
-  command that posts anything is `/inloop share pr --yes`, typed by you: a comment on your pull
-  request, through your own `gh` login.
-- It opens pages with `open` (macOS), `xdg-open` (Linux) or `start` (Windows). On a Mac,
-  `/inloop share mail` reads which app opens `mailto:` links (`plutil` on macOS's Launch
-  Services settings) and hands the page to that app with `open -b`, and `/inloop share copy`
-  puts the page on the clipboard with `osascript`. You choose who gets it and send it.
-- It makes no network requests and no model calls of its own. Claude writes the notes in your
-  session, so they cost output tokens; `/inloop tags summary` keeps them short.
+### Files it writes
 
-The details are in [docs/privacy.md](https://github.com/ierolsen/inloop/blob/main/docs/privacy.md).
+Only inside `.inloop/` in your project: the session logs (`.inloop/log/`), the review pages
+(`.inloop/review/`), what you share (`.inloop/share/`), the project's own settings
+(`.inloop/config.json`) and `.inloop/.gitignore`, which keeps the folder out of git. The paths are
+built from the project's root, which is why they are not fixed text in the code. inloop never
+writes build, start-up, settings or instruction files. Your settings for all projects are kept in
+Claude Code's plugin store.
+
+### Programs it runs, and why
+
+| Program | When | Why |
+|---|---|---|
+| `git` (`rev-parse`, `status`, `diff`, `show`, `log`, `rev-list`, `diff-tree`, `ls-files`, `blame`) | While you work, and for the review pages | To see what changed, in which commit, and which commit wrote each line |
+| `git fetch <remote> +refs/pull/<n>/head:refs/inloop/pr-<n>` | `/inloop review pr` | To review a pull request; it writes only that one reference |
+| `gh` (`--version`, `pr view`, `api`) | `/inloop review pr`, `/inloop share pr` | To read the pull request and inloop's earlier comment on it; with `--yes`, to post or update that comment |
+| `uname -s` | Before opening a page | To tell a Mac from Linux |
+| `open`, `xdg-open`, `cmd /c start`, `explorer` | `/inloop review`, `explain`, `share` | To show a page in your browser, or a file in your file manager |
+| `osascript` | `/inloop share mail` and `share copy`, on a Mac | To ask macOS which app opens `mailto:` links, and to put the page on the clipboard |
+| `open -b <mail app> <page>` | `/inloop share mail`, on a Mac | To start a new message in your mail app with the page attached |
+
+The file names and arguments in these commands come from your project, which is why they are not
+fixed text in the code. `git` and `gh` run with their password prompts turned off.
+
+### What leaves your computer
+
+Nothing, unless you ask for it:
+
+- `/inloop review pr` and `/inloop share pr` read a pull request from GitHub through your own
+  `gh` and `git`.
+- `/inloop share pr --yes`, typed by you at Claude Code's prompt, posts the review as a comment
+  on your pull request, through your own `gh` login.
+- `/inloop share mail` and `share copy` only hand the page to your mail app or your clipboard;
+  you choose who gets it and send it.
+
+inloop reads no credentials and no environment variables; `gh` and `git` use their own logins.
+It sends nothing from the conversation anywhere: it reads Claude's tool calls to record what
+changed, counts the notes and edits when a turn ends, and keeps all of it on your disk. Secrets
+are redacted before anything is written; the redaction code mentions forms such as
+`process.env.NAME` only to recognize such placeholders and leave them as they are.
+
+### Hooks, and what each one changes
+
+- `session.start`: finds the project, reads the settings, and registers inloop's two tools and
+  its `/inloop` command.
+- `prompt.compose`: adds one section, inloop's instructions, to the system prompt.
+- `tool.describe`: keeps inloop's two tools loaded rather than behind tool search.
+- `tool.call` on `Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Bash` and `PowerShell`: records
+  the change, then lets the tool run as it would without inloop.
+- `tool.call` on `mcp__inloop__note` and `mcp__inloop__recap`: inloop answers its own two tools,
+  which have no other implementation: it saves the note or recap and replies that it did. It
+  never answers in place of any other tool.
+- `ui.render` on those two tools: draws the notes and recaps as cards in the transcript.
+- `turn.start`, `turn.complete`: count what a turn recorded and show one line when it ends.
+- `command.run`: the `/inloop` command.
 
 ## License
 

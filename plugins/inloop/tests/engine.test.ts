@@ -473,18 +473,21 @@ test('/inloop share file writes a light page and its Markdown to attach to an em
   expect(w.files.get(ROOT + '/.inloop/share/inloop-work.html')).toContain('data-theme="light" data-fixed')
   const md = w.files.get(ROOT + '/.inloop/share/inloop-work.md') ?? ''
   expect(md).toStartWith('## Review: what Claude changed, and why')
-  expect(md).toContain('area is width times height, ask @⁠erol')
+  expect(md).toContain('area is width times height, ask @\u2060erol')
   expect(w.ran).toContain('xdg-open ' + ROOT + '/.inloop/share')
   expect(w.ran.filter((c) => c.startsWith('gh '))).toEqual([])
   expect((await $.command.run(command('share link'))).text).toStartWith('Sharing by link (a secret gist) comes in a later version.')
 })
 
 test('/inloop share asks where the review goes; on a Mac the mail app gets the page attached, or the clipboard holds it', async ($, on) => {
-  on('env.get', () => ({ value: '/Users/me' }))
   const { w, git } = await committedShapes($, on)
   const PAGE = ROOT + '/.inloop/share/inloop-work.html'
-  const PLIST = 'plutil -convert json -o - /Users/me/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist'
-  Object.assign(git, { 'uname -s': 'Darwin\n', [PLIST]: JSON.stringify({ LSHandlers: [{ LSHandlerURLScheme: 'slack', LSHandlerRoleAll: 'com.tinyspeck.slackmacgap' }] }), ['open -b com.apple.mail ' + PAGE]: '' })
+  // macOS's answer to which app opens mailto: links; none named means Apple Mail
+  const ASK = ['osascript', '-e', 'use framework "AppKit"', '-e', 'use scripting additions',
+    '-e', 'set u to current application\'s NSWorkspace\'s sharedWorkspace()\'s URLForApplicationToOpenURL:(current application\'s NSURL\'s URLWithString:"mailto:")',
+    '-e', 'if u is missing value then return ""',
+    '-e', 'return ((current application\'s NSBundle\'s bundleWithURL:u)\'s bundleIdentifier()) as text'].join(' ')
+  Object.assign(git, { 'uname -s': 'Darwin\n', [ASK]: '\n', ['open -b com.apple.mail ' + PAGE]: '' })
   // the person picks e-mail in the dialog: no mailto: handler chosen, so Apple Mail gets the page
   w.answer = 'E-mail: a new message with the page attached'
   const mailed = (await $.command.run(command('share'))).text
@@ -502,7 +505,7 @@ test('/inloop share asks where the review goes; on a Mac the mail app gets the p
   w.answer = 'copy it please'
   expect((await $.command.run(command('share'))).text).toStartWith('The page is on your clipboard (' + PAGE + '): paste it into Slack, Teams, a chat or an e-mail.')
   // web mail cannot take a file: the page is shown, to attach by hand
-  git[PLIST] = JSON.stringify({ LSHandlers: [{ LSHandlerURLScheme: 'mailto', LSHandlerRoleAll: 'com.google.Chrome' }] })
+  git[ASK] = 'com.google.Chrome\n'
   git['open -R ' + PAGE] = ''
   expect((await $.command.run(command('share mail'))).text).toBe('Your e-mail opens in a browser, which cannot take a file from inloop. The page is at ' + PAGE + ': attach it to the e-mail.\nShown in your file manager.')
   expect(w.ran.filter((c) => c.startsWith('gh '))).toEqual([])

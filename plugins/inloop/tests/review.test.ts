@@ -303,7 +303,7 @@ test('a page over its budget leaves out what it shows twice first, then the long
 })
 
 test('the Markdown of a review: no HTML and no mentions from a note, tags as on the page, and within its limit', async () => {
-  expect(md('a <b> `x<y> @a` @erol & @team-x')).toBe('a &lt;b&gt; `x<y> @a` @⁠erol &amp; @⁠team-x')
+  expect(md('a <b> `x<y> @a` @erol & @team-x')).toBe('a &lt;b&gt; `x<y> @a` @\u2060erol &amp; @\u2060team-x')
   const O = { code: 'en', tags: ['all'] as any, version: '0.1.0', marker: true, max: COMMENT_MAX, command: '/inloop share pr 7', made: 1_700_000_000_000 }
   const full = markdown(build(source()), labels('en'), O)
   expect(full.text.startsWith(MARKER + '\n\n## Review: what Claude changed, and why\n\n<sub>4 commits \u00b7 7 files \u00b7 5 notes</sub>\n')).toBe(true)
