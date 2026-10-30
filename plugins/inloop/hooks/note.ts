@@ -36,6 +36,7 @@ export type Recap = {
   reading_order: { file: string; why: string }[]
   groups: { role: string; files: string[] }[]
   check_by_hand: string[]
+  outcomes: { note: number; says: string }[] // what was learned after a note's change: a test, a measurement
 }
 
 const TEXT_MAX = 4000
@@ -115,6 +116,7 @@ export function cleanRecap(input: Record<string, unknown>): { recap: Recap; prob
     reading_order: arr(input.reading_order).map(obj).filter((r) => str(r.file)).map((r) => ({ file: str(r.file, 500), why: str(r.why) })),
     groups: arr(input.groups).map(obj).filter((g) => str(g.role)).map((g) => ({ role: str(g.role, 200), files: strings(g.files) })),
     check_by_hand: strings(input.check_by_hand),
+    outcomes: arr(input.outcomes).map(obj).filter((o) => Number.isInteger(Number(o.note)) && Number(o.note) > 0 && str(o.says)).map((o) => ({ note: Number(o.note), says: str(o.says) })),
   }
   const problems = recap.overview ? [] : ['overview is empty']
   return { recap, problems }

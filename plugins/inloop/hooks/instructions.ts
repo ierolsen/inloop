@@ -45,12 +45,12 @@ export function instructions(plugin: string, lang: Language, level: Level, adhd 
     '1. Before each logical change to files, call `' + note + '` once. A logical change is one idea, such as a new function and the call that uses it, and it may cover several files. List every file it will touch in `files`.',
     '2. Write every text field of the note in ' + name + ', even when the conversation is in another language. Keep code identifiers, file paths, commands and quoted code exactly as they are.',
     '3. Write like a developer who speaks ' + lang.english + ' explaining code to a colleague: ' + lang.english + ' sentences, with every technical word in the form developers use, which is usually English. This holds in every field and for every kind of technical word: what things are (seed, split, pipeline, cache, endpoint), what code does (shuffle, fit, deploy, merge, retry) and how it behaves (reproducible, deterministic, idempotent). Never replace a technical word with an everyday ' + lang.english + ' paraphrase or a word-for-word translation, not even to make a sentence easier; explain the term in `terms` instead.' + (example(lang.code) ? ' ' + example(lang.code) : ''),
-    '4. `tldr` is the one thing to remember about the change, in one short sentence. `what` says what the change does, for a reader who did not write the code. `why` gives the reason for this approach. Set `basis` to "verified" when a test, a measurement or documentation you read supports the reason, and to "judgment" when it is your own choice.',
+    '4. `tldr` is the one thing to remember about the change, in one short sentence that says what changes and why (for example: "households goes: the model already sees Population and AveOccup, and the column only repeats them"). `what` says what the change does, for a reader who did not write the code, and names everything it removes. `why` gives the reason for this approach in your own words: when the user asked for the change, say so, and still give the technical reason it is right, or your doubt. Set `basis` to "verified" when a test, a measurement or documentation you read supports the reason, and to "judgment" when it is your own choice.',
     '5. Whenever the change adds a class, function, method, endpoint, module or type, add it to `symbols`: why it exists, why it has this shape (for example a class rather than a function), and what calls it.',
     '6. Whenever the change brings in something defined elsewhere (an import, a call to a function or class from another file, a library), add it to `uses`: its `name` as it appears in the code, `from` where (a file path in the project, or the package), and `why` this change uses it here. For a library, also say why this library or class rather than another.',
-    '7. `lines` are comments on single lines: `anchor` is text copied exactly from one line of the code you are about to write, long enough to find that line, and `says` explains that line. `removed` does the same for lines you delete: `anchor` is copied from a line of the code as it is now, and `says` why it goes and what, if anything, takes its place. Name in `what` everything the change removes: a function, a feature, a parameter, a file. `terms` explains technical terms: the term as developers say it, and what it means. `impact` names other parts of the system the change affects or depends on.',
+    '7. `lines` are comments on single lines: `anchor` is text copied exactly from one line of the code you are about to write, long enough to find that line, and `says` explains that line. `removed` does the same for lines you delete: `anchor` is copied from a line of the code as it is now, and `says` gives the reason that line goes: what made it unnecessary, wrong or replaceable, who still used it, and the evidence you have. The reader sees that the line is deleted, so never write only that it is deleted or that nothing replaces it: not "The function is deleted, nothing replaces it" but "Its column is Population / AveOccup, two columns the model already sees, so it only repeats them; add_features and one test were its only callers". `terms` explains technical terms: the term as developers say it, and what it means. `impact` names other parts of the system the change affects or depends on.',
     '8. ' + LEVEL_RULES[level],
-    '9. When you finish a task that changed files, call `' + recap + '` once: an overview, the order to read the changed files in and why, the files grouped by role, and what the user should check by hand. Write it in the same language as the notes.',
+    '9. When you finish a task that changed files, call `' + recap + '` once: an overview, the order to read the changed files in and why, the files grouped by role, and what the user should check by hand. Notes come before their change, so what you learn after it (a test result, a measurement, a surprise) goes in `outcomes`, with the number inloop gave the note ("note 3 saved"). Write it in the same language as the notes.',
     '10. Prefer the Edit and Write tools for changing files. When you must change files with a shell command, call `' + note + '` before that command too.',
     '11. Never put secrets, tokens or passwords in a note or a recap.',
   ]
@@ -67,7 +67,7 @@ export const NOTE_SPEC = {
     type: 'object',
     properties: {
       title: text('The change in a few words, like a commit subject.'),
-      tldr: text('The one thing to remember about this change, in one short sentence.'),
+      tldr: text('The one thing to remember about this change, in one short sentence: what changes and why.'),
       files: list('Every file this change will create, edit or delete, as paths relative to the project.', { type: 'string' }),
       what: text('What the change does, for a reader who did not write the code.'),
       why: text('Why this approach: the reason the change is made this way.'),
@@ -117,7 +117,7 @@ export const NOTE_SPEC = {
         type: 'object',
         properties: {
           anchor: text('Text copied exactly from one line that is being deleted, as it is in the code now, long enough to find that line.'),
-          says: text('Why that line goes, and what takes its place, if anything.'),
+          says: text('The reason this line goes: what made it unnecessary, wrong or replaceable, who still used it, and the evidence. Not merely that it is deleted.'),
         },
         required: ['anchor', 'says'],
       }),
@@ -157,7 +157,11 @@ export const RECAP_SPEC = {
         required: ['role', 'files'],
       }),
       check_by_hand: list('What the user should check by hand.', { type: 'string' }),
-    },
+      outcomes: list('What you learned after a note\'s change: a test result, a measurement, a surprise.', {
+        type: 'object',
+        properties: { note: { type: 'integer', description: 'The number inloop gave the note when it saved it.' }, says: text('What happened, with the numbers.') },
+        required: ['note', 'says'],
+      }),    },
     required: ['overview', 'reading_order'],
   },
 }

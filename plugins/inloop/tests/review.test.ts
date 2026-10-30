@@ -360,3 +360,20 @@ test('a deleted line is explained beside it in the diff, and the code as it stan
   expect(text).toContain('- `shapes.py:5` ~~`def largest(rects):`~~ (deleted line): Nobody calls it **any more**.')
   expect(markdown(build(src), labels('en'), { code: 'en', level: 'design', version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text).not.toContain('deleted line')
 })
+
+// note n1 (number 1 in session s1) is the Shapes note of commit b2b2b2b2; a recap names it
+const OUTCOME_RECORDS = () => RECORDS.map((r: any) => (r.kind === 'note' && r.id === 'n1' ? { ...r, n: 1 } : r))
+
+test('what was found after a change shows under its note, with the reason, in the file\'s Changes and in Markdown', async () => {
+  const after = rec('recap', { id: 'r2', recap: { overview: 'Checked.', reading_order: [], groups: [], check_by_hand: [], outcomes: [{ note: 1, says: 'The tests pass: **4 of 4**.' }] } })
+  const r = build(source({ records: [...OUTCOME_RECORDS(), after] }))
+  expect(r.groups[0].notes[0].outcomes).toEqual(['The tests pass: **4 of 4**.'])
+  const html = render(r, explore(r, STATES as any, INFO), labels('tr'), OPTIONS)
+  linksHold(html)
+  expect(html).toContain('<dt>Sonuç</dt><dd class="outcome rich"><ul><li>The tests pass: <strong>4 of 4</strong>.</li></ul></dd>')
+  const changes = html.split('<section class="view" id="' + fileId('shapes.py') + '_changes"')[1].split('</section>')[0]
+  expect(changes).toContain('<div class="why-box rich"><b>Neden</b>')
+  expect(changes).toContain('<div class="outcome-box rich"><b>Sonuç</b><ul><li>The tests pass: <strong>4 of 4</strong>.</li></ul></div>')
+  expect(markdown(build(source({ records: [...OUTCOME_RECORDS(), after] })), labels('en'), { code: 'en', level: 'full', version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text)
+    .toContain('**Outcome**\n\n- The tests pass: **4 of 4**.')
+})

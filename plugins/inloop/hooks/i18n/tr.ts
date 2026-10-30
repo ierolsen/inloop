@@ -236,4 +236,8 @@ export const tr: Labels = {
   share_link_later: 'Link ile paylaşım (secret gist) sonraki sürümde. Şimdilik: `/inloop share` (dosya) ya da `/inloop share pr` (PR yorumu).',
   review_pr_no_git: 'Burası bir git reposu değil.',
   review_pr_fetch_failed: 'PR #{number} fetch edilemedi: {error}',
+
+  // outcomes after a change
+  r_outcome: 'Sonuç',
+  card_outcomes: 'Sonuçlar',
 }

@@ -60,5 +60,6 @@ export function recapCard(t: any, recap: Recap, l: Labels): any {
     parts.push(block(t, l.page_start_here, recap.reading_order.map((r, i) => i + 1 + '. ' + code(r.file) + (r.why ? ': ' + r.why : '')).join('\n')))
   }
   if (recap.check_by_hand.length) parts.push(block(t, l.page_check, list(recap.check_by_hand)))
+  if (recap.outcomes.length) parts.push(block(t, l.card_outcomes, list(recap.outcomes.map((o) => say(l.page_in_note, { n: o.note }) + ': ' + o.says))))
   return frame(t, parts)
 }

@@ -83,6 +83,7 @@ function noteMd(ref: NoteRef, g: Group, where: Map<string, { path: string; at: n
   const list = (name: string, items: string[]) => (items.length ? out.push('**' + name + '**\n\n' + items.map((x) => '- ' + line(x)).join('\n')) : 0)
   if (keep.what && o.level !== 'big-picture') field(l.page_what, n.what)
   field(l.page_why, n.why)
+  list(l.r_outcome, ref.outcomes)
   list(l.r_instead, n.alternatives)
   list(l.r_impact, n.impact)
   list(l.page_risks, n.risks)

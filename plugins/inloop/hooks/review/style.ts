@@ -8,6 +8,7 @@ const LIGHT = `
   --bg: #f6f5f1; --panel: #ffffff; --ink: #1f1d1a; --muted: #67625a; --faint: #8f897f;
   --line: #e3dfd6; --accent: #2c6a5a; --accent-soft: #e2eee8; --on-accent: #ffffff;
   --why: #fff5d9; --why-line: #e3c25f; --shadow: rgba(31, 29, 26, .12);
+  --outcome: #e8f1fb; --outcome-line: #7ea6d8;
   --add: #e9f6ec; --add-ink: #1b6630; --add-gutter: #d3ecd9; --del: #fcecea; --del-ink: #962a1d; --del-gutter: #f6d6d1;
   --warn: #fcf0e1; --warn-ink: #7f4508; --code: #fbfaf7; --code-line: #efece5;
   --k: #8a3fa0; --s: #1f6f3a; --n: #b0531b; --f: #1d5aa6; --c: #8f897f;
@@ -16,6 +17,7 @@ const DARK = `
   --bg: #151412; --panel: #1d1c19; --ink: #ebe7df; --muted: #a8a297; --faint: #78736a;
   --line: #312f2a; --accent: #8ccab5; --accent-soft: #1d2e28; --on-accent: #10201b;
   --why: #2b2516; --why-line: #7d682b; --shadow: rgba(0, 0, 0, .5);
+  --outcome: #172231; --outcome-line: #4f74a3;
   --add: #15291b; --add-ink: #9be0ae; --add-gutter: #1c3524; --del: #331a19; --del-ink: #f2a79d; --del-gutter: #43211f;
   --warn: #2d2215; --warn-ink: #efc287; --code: #191816; --code-line: #262420;
   --k: #d39be6; --s: #9bd5a8; --n: #f0ad7e; --f: #8fb8f0; --c: #8a847a;
@@ -235,6 +237,12 @@ ul.changed .st { margin-left: 0; width: 12px; }
 dl.terms { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 15px; }
 dl.terms dt { font-weight: 650; font-family: ${MONO}; font-size: 13.5px; padding-top: 2px; color: var(--ink); overflow-wrap: anywhere; }
 dl.terms dd { margin: 0; min-width: 0; }
+.story dd.outcome { background: var(--outcome); border-left: 3px solid var(--outcome-line); padding: 6px 12px; border-radius: 0 6px 6px 0; }
+.why-box, .outcome-box { font-size: 14.5px; border-radius: 0 6px 6px 0; padding: 6px 12px; margin: 0 0 8px; max-width: 900px; }
+.why-box { background: var(--why); border-left: 3px solid var(--why-line); }
+.outcome-box { background: var(--outcome); border-left: 3px solid var(--outcome-line); }
+.why-box > b, .outcome-box > b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 2px; }
+.outcome-box ul { margin: 0; padding-left: 18px; }
 .missed { margin-top: 12px; font-size: 15px; }
 .missed ul { margin: 6px 0 0; padding-left: 20px; }
 .missed li .head { display: flex; gap: 8px; align-items: baseline; }

@@ -205,6 +205,7 @@ function notesHtml(g: Group, c: Ctx): string {
     out.push('<dl class="story">')
     if (n.what) out.push('<dt>' + esc(l.page_what) + '</dt><dd class="rich">' + rich(n.what) + '</dd>')
     if (n.why) out.push('<dt>' + esc(l.page_why) + '</dt><dd class="why rich">' + rich(n.why) + basis + tags + '</dd>')
+    if (ref.outcomes.length) out.push('<dt>' + esc(l.r_outcome) + '</dt><dd class="outcome rich">' + list(ref.outcomes) + '</dd>')
     if (n.alternatives.length) out.push('<dt>' + esc(l.r_instead) + '</dt><dd class="rich">' + list(n.alternatives) + '</dd>')
     if (n.impact.length) out.push('<dt>' + esc(l.r_impact) + '</dt><dd class="rich">' + list(n.impact) + '</dd>')
     if (n.risks.length) out.push('<dt>' + esc(l.page_risks) + '</dt><dd class="risk rich">' + list(n.risks) + '</dd>')
@@ -359,8 +360,14 @@ function changesHtml(page: FilePage, changes: FilePage['changes'], c: Ctx): stri
       ? esc(say(l.r_commit_of, { n: g.index, total: c.r.counts.commits })) + ' &middot; <span class="sha">' + short(g.sha) + '</span>' + (g.time ? ' &middot; ' + esc(when(g.time, code)) : '')
       : esc(heading(g, l))
     const title = g.kind === 'commit' ? heading(g, l) : g.notes.find((r) => covers(r, page.path))?.record.note.title || heading(g, l)
-    const tldrs = g.notes.filter((r) => covers(r, page.path)).map((r) => r.record.note.tldr).filter(Boolean)
-    const head = '<div class="change-head"><p class="eyebrow">' + eyebrow + '</p><h3 class="title"><a href="#' + g.id + '">' + esc(title) + '</a></h3>' + tldrs.map((t) => '<p class="tldr">' + span(t) + '</p>').join('') + '</div>'
+    // what each note that explains this file says about the change: its point, its reason, and
+    // what was found after it
+    const told = g.notes.filter((r) => covers(r, page.path)).map((r) => {
+      const n = r.record.note
+      return (n.tldr ? '<p class="tldr">' + span(n.tldr) + '</p>' : '') + (n.why ? '<div class="why-box rich"><b>' + esc(l.page_why) + '</b>' + rich(n.why) + '</div>' : '') +
+        (r.outcomes.length ? '<div class="outcome-box rich"><b>' + esc(l.r_outcome) + '</b><ul>' + r.outcomes.map((o) => '<li>' + span(o) + '</li>').join('') + '</ul></div>' : '')
+    })
+    const head = '<div class="change-head"><p class="eyebrow">' + eyebrow + '</p><h3 class="title"><a href="#' + g.id + '">' + esc(title) + '</a></h3>' + told.join('') + '</div>'
     const body = c.trim.changes || f.tooBig ? '<p class="hint"><a href="#' + f.anchor + '">' + esc(l.x_see_commit) + '</a></p>' : fileHtml(g, f, c, true)
     return '<div class="change">' + head + body + '</div>'
   }).join('')

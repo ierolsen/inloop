@@ -46,10 +46,11 @@ test('a card speaks the reader\'s language, draws a half-streamed note, and hide
 test('the recap\'s row is drawn as a summary card; other tools keep their own rows', async ($, on) => {
   worldOf(on)
   await $.session.start(START)
-  const recap = { overview: 'Added shapes.', reading_order: [{ file: 'shapes.py', why: 'the class' }], check_by_hand: ['Run `python3 app.py`.'] }
+  const recap = { overview: 'Added shapes.', reading_order: [{ file: 'shapes.py', why: 'the class' }], check_by_hand: ['Run `python3 app.py`.'], outcomes: [{ note: 2, says: 'All 4 tests pass.' }] }
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ ...row('mcp__inloop__recap', recap), surface } as any)
     expect(await ui.find({ type: 'Markdown', text: 'Added shapes.' }), surface).toBeDefined()
+    expect((await ui.find({ type: 'Markdown', text: /Outcomes/ }))?.text, surface).toBe('**Outcomes**\n- note 2: All 4 tests pass.')
     expect((await ui.find({ type: 'Markdown', text: /Start here/ }))?.text, surface).toBe('**Start here**\n1. `shapes.py`: the class')
     await ui.unmount()
   }

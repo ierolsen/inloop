@@ -4,7 +4,7 @@
 
 import type { LogRecord, NoteRecord, EditRecord, CommitRecord, RecapRecord } from '../log.ts'
 import type { Recap } from '../note.ts'
-import { sameFile } from '../note.ts'
+import { sameFile, cleanRecap } from '../note.ts'
 import { parseHunks, flat, current, type FilePatch, type Line } from './patch.ts'
 import { place, segments, marks, markKey, type Mark, type Segment } from './anchor.ts'
 import { roleOf, type Role } from './roles.ts'
@@ -28,7 +28,8 @@ export type Source = {
   project: string
 }
 
-export type NoteRef = { id: string; n: number; record: NoteRecord }
+// outcomes: what the recap of the note's session says happened after its change
+export type NoteRef = { id: string; n: number; record: NoteRecord; outcomes: string[] }
 export type Tag = 'added' | 'deleted' | 'renamed' | 'unexplained' | 'outside' | 'sensitive' | 'binary' | 'cut' | 'redacted'
 export type FileView = { data: FileData; role: Role; tags: Tag[]; lines: (Line | null)[]; rows: Segment[]; pins: Map<string, number>; pinAt: Map<number, number[]>; anchor: string; tooBig: boolean }
 export type Group = {
@@ -88,11 +89,18 @@ export function build(src: Source): Review {
       const l = parseLevel(r.level ?? r.detail)
       if (l) levelOf.set(r.session, l)
     }
-    if (r.kind === 'note') notes.set(r.id, { id: r.id, n: ++n, record: r })
+    if (r.kind === 'note') notes.set(r.id, { id: r.id, n: ++n, record: r, outcomes: [] })
     if (r.kind === 'edit' && r.status === 'ok') edits.set(r.id, r)
     if (r.kind === 'commit') commits.push(r)
     if (r.kind === 'recap' && !r.agent) recaps.push(r)
     if (r.kind === 'outside') for (const e of r.entries) outside.add(e.path)
+  }
+  // a recap's outcomes name notes by the number inloop gave them in their session
+  for (const r of src.records) {
+    if (r.kind !== 'recap') continue
+    for (const o of cleanRecap(r.recap).recap.outcomes) {
+      for (const ref of notes.values()) if (ref.record.session === r.session && ref.record.n === o.note) ref.outcomes.push(o.says)
+    }
   }
   const byNote = new Map<string, EditRecord[]>()
   for (const e of edits.values()) if (e.note) byNote.set(e.note, [...(byNote.get(e.note) ?? []), e])
@@ -191,7 +199,7 @@ export function build(src: Source): Review {
   const levels = [...sessions].map((s) => levelOf.get(s)).filter((l): l is Level => !!l)
   return {
     project: src.project, scope: src.scope, range: src.range, pr: src.pr ?? null, git: src.git, started, groups, explained, more: src.more,
-    recaps: relevant.map((r) => r.recap),
+    recaps: relevant.map((r) => cleanRecap(r.recap).recap), // every field there, whoever wrote it
     checks: [...new Set(relevant.flatMap((r) => r.recap.check_by_hand))],
     index, links,
     counts: { commits: src.commits.length, files: seen.size, notes: used.size, unexplained: all.reduce((k, g) => k + g.files.filter((f) => f.tags.includes('unexplained')).length, 0) },

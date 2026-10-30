@@ -235,4 +235,8 @@ export const de: Labels = {
   share_link_later: 'Teilen per Link (ein geheimer Gist) kommt in einer späteren Version. Bis dahin: `/inloop share` (eine Datei) oder `/inloop share pr` (ein PR-Kommentar).',
   review_pr_no_git: 'Kein git-Repository.',
   review_pr_fetch_failed: 'PR #{number} konnte nicht geholt werden: {error}',
+
+  // outcomes after a change
+  r_outcome: 'Ergebnis',
+  card_outcomes: 'Ergebnisse',
 }

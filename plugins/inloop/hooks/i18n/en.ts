@@ -238,6 +238,10 @@ export const en = {
   share_link_later: 'Sharing by link (a secret gist) comes in a later version. For now: `/inloop share` (a file) or `/inloop share pr` (a PR comment).',
   review_pr_no_git: 'Not a git repository.',
   review_pr_fetch_failed: 'Could not fetch PR #{number}: {error}',
+
+  // outcomes after a change
+  r_outcome: 'Outcome',
+  card_outcomes: 'Outcomes',
 }
 
 export type Labels = typeof en

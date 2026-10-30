@@ -48,7 +48,11 @@ test('the instructions name the language, the level and the terminology rule, an
   expect(tr).toContain('Never replace a technical word with an everyday Turkish paraphrase or a word-for-word translation')
   expect(tr).toContain('not "rastgele ve tekrarlanabilir bölme"')
   expect(instructions('inloop', language('de')!, 'full')).toContain('not "Zufallssamen"')
-  expect(instructions('inloop', language('fr')!, 'full')).not.toContain(' not "')
+  // a language inloop has no examples for gets the rule alone
+  const fr = instructions('inloop', language('fr')!, 'full')
+  expect(fr).toContain('Never replace a technical word with an everyday French paraphrase')
+  expect(fr).not.toContain('In Turkish')
+  expect(fr).not.toContain('In German')
   expect(tr).toContain('Add to `terms` every technical term')
   expect(instructions('inloop', language('de')!, 'big-picture')).toContain('leave `lines`, `removed`, `parameters` and `terms` empty')
   expect(tr).toContain('`removed` does the same for lines you delete')
