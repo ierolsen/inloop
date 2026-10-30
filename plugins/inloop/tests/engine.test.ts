@@ -119,7 +119,7 @@ test('/inloop lang and tags change the next instructions, for all projects or fo
     'Dieses Projekt hat eine eigene Wahl, Deutsch, die hier Vorrang hat; /inloop lang reset --project entfernt sie.')
   expect((await $.command.run(command('lang reset --project'))).text).toBe('De inloop-notities zijn weer in Nederlands (je instelling voor alle projecten).')
   // the plugin's own setting (its default, English, as /config shows it) is what reset goes back to
-  expect((await $.command.run(command('lang reset'))).text).toBe('inloop notes are in English again (the plugin setting).')
+  expect((await $.command.run(command('lang reset'))).text).toBe('inloop notes are in English again (default).')
   expect((await $.command.run(command('lang'))).text).toBe('Name a language, as in /inloop lang Turkish or /inloop lang de.')
   // a language with no labels: the notes are in it, inloop's own messages stay English
   expect((await $.command.run(command('lang Japanese'))).text).toBe('From now on inloop notes are in Japanese (日本語), in all your projects.\n' +
@@ -138,13 +138,18 @@ test('/inloop lang and tags change the next instructions, for all projects or fo
   const rules = await written()
   expect(rules).toContain('Tag "summary": keep each note to `tldr`, `what` and `why`')
   expect(rules).not.toContain('`lines` are comments on single lines')
-  expect((await $.command.run(command('tags loud'))).text).toStartWith('That is no tag inloop knows. Tags combine, as in /inloop tags review,learn:\n  summary       The point, what changed and why')
-  expect((await $.command.run(command('status'))).text).toContain('Notes are in English (the plugin setting), notes hold summary (your setting for all projects), ADHD-friendly off (the plugin setting).')
+  expect((await $.command.run(command('tags loud'))).text).toStartWith('That is no tag inloop knows. Tags combine, as in /inloop tags review,learn:\n  summary       The point of each change: what changed and why')
+  // each setting says where it comes from and how to change it, or how to go back to the default
+  expect((await $.command.run(command('status'))).text).toContain([
+    'Language: English (default). To change: /inloop lang <language>, for example /inloop lang tr',
+    'Tags: summary (your setting for all projects). To change: /inloop tags <tags>, for example /inloop tags review. Every tag: /inloop tags. Back to the default: /inloop tags reset',
+    'ADHD-friendly notes: off (default). To change: /inloop adhd on',
+  ].join('\n'))
   expect((await $.command.run(command('tags'))).text).toStartWith('inloop notes hold: summary (your setting for all projects).')
   // the commands and values of earlier versions still work
   expect((await $.command.run(command('level full'))).text).toBe('From now on inloop notes hold: all, in all your projects.')
   expect((await $.command.run(command('detail standard'))).text).toBe('From now on inloop notes hold: review, learn, in all your projects.')
-  expect((await $.command.run(command('tags reset'))).text).toBe('inloop notes hold review again (the plugin setting).')
+  expect((await $.command.run(command('tags reset'))).text).toBe('inloop notes hold review again (default).')
   expect((await $.command.run(command('fly'))).text).toStartWith('inloop has no command "fly".\ninloop commands:')
 })
 
@@ -250,7 +255,7 @@ test('a reload keeps inloop off when the log says it was turned off', async ($, 
   const w = worldOf(on, { files: { [LOG]: earlier.map((r) => JSON.stringify(r) + '\n').join('') } })
   await $.session.start(START)
   expect((await $.prompt.compose(COMPOSE as any)).sections.map((s) => s.id)).toEqual(['core:intro'])
-  expect((await $.command.run(command('status'))).text).toStartWith('inloop is off.')
+  expect((await $.command.run(command('status'))).text).toStartWith('inloop is off for this session')
   await $.tool.call({ tool: 'Write', file_path: ROOT + '/a.py', content: 'a\n' } as any)
   expect(edits(w)).toEqual([])
 })
@@ -294,7 +299,7 @@ test('/inloop adhd changes how the next notes are written, not how much they say
   expect(await written()).not.toContain('How to write for this user')
   expect((await $.command.run(command('adhd on'))).text).toContain('This project has its own choice, off, which comes first here')
   expect((await $.command.run(command('adhd maybe'))).text).toBe('Use /inloop adhd on or /inloop adhd off.')
-  expect((await $.command.run(command('adhd reset'))).text).toBe('ADHD-friendly notes are off again (the plugin setting).')
+  expect((await $.command.run(command('adhd reset'))).text).toBe('ADHD-friendly notes are off again (default).')
 })
 
 test('commits made through the shell are recorded with the edits and notes that went into them', async ($, on) => {

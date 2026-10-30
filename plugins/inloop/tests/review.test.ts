@@ -36,6 +36,17 @@ test('every language has every label, with the same placeholders and both plural
   }
 })
 
+test('a tag says what the notes hold, never what they cost', async () => {
+  const priced: string[] = []
+  for (const code of ['en', 'tr', 'de', 'nl']) {
+    const l = labels(code) as any
+    for (const key of Object.keys(l).filter((k) => k.startsWith('tag_desc_'))) {
+      if (/cheap|expensive|cost|ucuz|pahal|maliyet|günstig|teuer|kosten|goedkoop|duur/i.test(l[key])) priced.push(code + ' ' + key)
+    }
+  }
+  expect(priced).toEqual([])
+})
+
 test('counts and language names follow the reader\'s language', async () => {
   expect([1, 2].map((n) => count('de', labels('de').notes, n))).toEqual(['1 Notiz', '2 Notizen'])
   expect([1, 3].map((n) => count('tr', labels('tr').files, n))).toEqual(['1 dosya', '3 dosya'])
@@ -398,7 +409,7 @@ test('a dialog chooses the tags: every tag in English with what it adds, the tag
   const dialog = html.split('<dialog')[1].split('</dialog>')[0]
   expect(dialog.match(/data-tag-choice="/g)?.length).toBe(7)
   expect(dialog).toContain('<button type="button" data-tag-choice="review" aria-pressed="true"><span class="n">review</span><span class="badge new">yazıldı</span>')
-  expect(dialog).toContain('<button type="button" data-tag-choice="summary" aria-pressed="false"><span class="n">summary</span><span class="d">Özü, ne değişti ve neden')
+  expect(dialog).toContain('<button type="button" data-tag-choice="summary" aria-pressed="false"><span class="n">summary</span><span class="d">Her değişikliğin özü: ne değişti ve neden')
   expect(dialog).toContain('&quot;decisions&quot;:[&quot;alternatives&quot;,&quot;impact&quot;,&quot;risks&quot;]')
   // a skill wrote learn's parts in a review session: both are pressed, only review is marked written
   const more = render(r, explore(r, STATES as any, INFO), labels('en'), { ...OPTIONS, chosen: ['review'] }).split('<dialog')[1]

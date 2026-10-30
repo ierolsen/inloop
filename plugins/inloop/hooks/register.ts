@@ -925,18 +925,27 @@ async function reviewPr($: any, which: string, theme: Theme, l: Labels): Promise
   return writeAndShow($, 'review-pr-' + pr.number, theme, html, cut, false, l)
 }
 
+// What inloop does now: each setting with where it comes from and the command that changes it, what
+// this session recorded, and the commands to go on with
 function statusText(): string {
   const code = settings.language.code
   const l = labels(code)
-  return say(l.status, {
-    state: enabled ? l.state_on : l.state_off,
-    language: nameOf(settings.language, code), language_source: sourceName(l, settings.language.source),
-    tags: tagsName(settings.tags.value), tags_source: sourceName(l, settings.tags.source),
-    adhd: settings.adhd.value ? l.state_on : l.state_off, adhd_source: sourceName(l, settings.adhd.source),
-    notes: count(code, l.notes, tally.notes), edits: count(code, l.edits, tally.edits),
-    unexplained: tally.unexplained, files: count(code, l.files, tally.outside),
-    log: partPath(root, session, part),
-  })
+  const ownSource = (source: string) => source === 'user' || source === 'project'
+  const setting = (line: string, source: string, change: string, reset: string) =>
+    line + ' ' + change + (ownSource(source) ? '. ' + say(l.status_reset, { command: reset + (source === 'project' ? ' --project' : '') }) : '')
+  const tags = settings.tags.value
+  return [
+    enabled ? l.on : l.off,
+    setting(say(l.status_lang, { value: nameOf(settings.language, code), source: sourceName(l, settings.language.source) }), settings.language.source,
+      say(l.status_lang_change, { example: settings.language.code === 'en' ? 'tr' : 'en' }), '/inloop lang reset'),
+    setting(say(l.status_tags, { value: tagsName(tags), source: sourceName(l, settings.tags.source) }), settings.tags.source,
+      say(l.status_tags_change, { example: tags.length === 1 && tags[0] === 'summary' ? 'review' : 'summary' }), '/inloop tags reset'),
+    setting(say(l.status_adhd, { value: settings.adhd.value ? l.state_on : l.state_off, source: sourceName(l, settings.adhd.source) }), settings.adhd.source,
+      say(l.status_adhd_change, { example: settings.adhd.value ? 'off' : 'on' }), '/inloop adhd reset'),
+    say(l.status_session, { notes: count(code, l.notes, tally.notes), edits: count(code, l.edits, tally.edits), unexplained: tally.unexplained, files: count(code, l.files, tally.outside) }),
+    say(l.status_commands, { commands: ['/inloop review', '/inloop explain [path]', '/inloop share', enabled ? '/inloop off' : '/inloop on', '/inloop help'].join(' \u00b7 ') }),
+    say(l.status_log, { log: partPath(root, session, part) }),
+  ].join('\n')
 }
 
 export function register(on: any, pluginOptions: any) {
