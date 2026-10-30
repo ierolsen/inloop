@@ -17,6 +17,7 @@ export const tr: Labels = {
     '  /inloop review <aralık>       istenen commit\'ler: main.., HEAD~5.., a1b2c3d',
     '  /inloop review all            inloop\'un kaydettiği tüm commit\'ler',
     '  /inloop explain [yol]         kodun şimdiki hâli, açıklamaları ve her satırın neden orada olduğu',
+    '  /inloop onboard               bu projede notlar codebase\'e yeni gelen için; tur için /inloop:onboard',
     '  /inloop review pr [n]         bir pull request, gh ile GitHub\'dan çekilir',
     '  /inloop share [aralık]        .inloop/share içine sayfa ve Markdown: e-postaya eklemek için',
     '  /inloop share pr [n] [--yes]  pull request yorumunun önizlemesi; --yes gönderir',
@@ -251,4 +252,14 @@ export const tr: Labels = {
   x_level_desc_essentials: 'Ne ve neden; yalnızca kodun kendisinin göstermedikleri.',
   x_level_desc_design: 'Kararlar, trade-off\'lar ve etkiledikleri yerler.',
   x_level_desc_big_picture: 'Mimari ve uzun vadeli sonuçlar; satır ayrıntısı yok.',
+
+  // onboarding
+  page_setup: 'Kurulum ve çalıştırma',
+  page_conventions: 'Konvansiyonlar',
+  page_questions: 'Kendini test et',
+  page_answer: 'Cevap',
+  page_first_tasks: 'İlk görevler',
+  x_glossary: 'Terimler sözlüğü',
+  x_glossary_hint: 'Notların açıkladığı her terim ve geçtiği yer.',
+  onboard_set: 'Bu projede notlar artık "onboarding" seviyesinde: her değişiklik kodun projedeki yerini ve sırada neyi okuman gerektiğini de anlatır. Geri almak için: /inloop level reset --project\nCodebase turunu başlatmak için: /inloop:onboard (bir bölüm için /inloop:onboard <klasör>)',
 }

@@ -37,6 +37,11 @@ export type Recap = {
   groups: { role: string; files: string[] }[]
   check_by_hand: string[]
   outcomes: { note: number; says: string }[] // what was learned after a note's change: a test, a measurement
+  // an onboarding guide's parts; empty in the recap of a task
+  setup: string[] // how to install, run, test and debug the project
+  conventions: string[] // the rules the code follows
+  questions: { q: string; a: string }[] // to check one's understanding
+  first_tasks: string[] // small, safe changes to make first
 }
 
 const TEXT_MAX = 4000
@@ -117,6 +122,10 @@ export function cleanRecap(input: Record<string, unknown>): { recap: Recap; prob
     groups: arr(input.groups).map(obj).filter((g) => str(g.role)).map((g) => ({ role: str(g.role, 200), files: strings(g.files) })),
     check_by_hand: strings(input.check_by_hand),
     outcomes: arr(input.outcomes).map(obj).filter((o) => Number.isInteger(Number(o.note)) && Number(o.note) > 0 && str(o.says)).map((o) => ({ note: Number(o.note), says: str(o.says) })),
+    setup: strings(input.setup),
+    conventions: strings(input.conventions),
+    questions: arr(input.questions).map(obj).filter((x) => str(x.q) && str(x.a)).map((x) => ({ q: str(x.q, 500), a: str(x.a) })),
+    first_tasks: strings(input.first_tasks),
   }
   const problems = recap.overview ? [] : ['overview is empty']
   return { recap, problems }

@@ -16,6 +16,7 @@ export const nl: Labels = {
     '  /inloop review <bereik>       willekeurige commits: main.., HEAD~5.., a1b2c3d',
     '  /inloop review all            alle commits die inloop heeft vastgelegd',
     '  /inloop explain [pad]         de code zoals hij nu is, met uitleg en waarom elke regel er staat',
+    '  /inloop onboard               notities voor wie nieuw is in deze code, hier; /inloop:onboard leidt rond',
     '  /inloop review pr [n]         een pull request, met gh van GitHub opgehaald',
     '  /inloop share [bereik]        een pagina en de Markdown ervan in .inloop/share, om aan een e-mail toe te voegen',
     '  /inloop share pr [n] [--yes]  een preview van de reactie voor de pull request; --yes plaatst hem',
@@ -250,4 +251,14 @@ export const nl: Labels = {
   x_level_desc_essentials: 'Wat en waarom, alleen wat de code zelf niet laat zien.',
   x_level_desc_design: 'Beslissingen, trade-offs en wat ze verder raken.',
   x_level_desc_big_picture: 'Architectuur en gevolgen op lange termijn, zonder regeldetails.',
+
+  // onboarding
+  page_setup: 'Draaien en testen',
+  page_conventions: 'Conventies',
+  page_questions: 'Test jezelf',
+  page_answer: 'Antwoord',
+  page_first_tasks: 'Eerste taken',
+  x_glossary: 'Woordenlijst',
+  x_glossary_hint: 'Elke term die de notities uitleggen, en waar die voorkomt.',
+  onboard_set: 'Notities in dit project leggen nu uit op het niveau "onboarding": elke wijziging zegt ook waar die in de codebase zit en wat je daarna leest. /inloop level reset --project maakt het ongedaan.\nDe rondleiding door de code start met: /inloop:onboard, of /inloop:onboard <map> voor één deel.',
 }

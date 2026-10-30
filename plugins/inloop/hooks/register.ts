@@ -17,7 +17,7 @@ import { markdown, MARKER, COMMENT_MAX } from './review/markdown.ts'
 import { parsePatch, added, clip, lineCount } from './review/patch.ts'
 import type { Theme } from './review/html.ts'
 import { noteCard, recapCard, sentBackRow } from './live/card.ts'
-import { literals, sendBack } from './jargon.ts'
+import { literals, recapLiterals, sendBack } from './jargon.ts'
 
 const PLUGIN = 'inloop'
 const VERSION = '0.1.0'
@@ -514,7 +514,7 @@ async function explainedFiles($: any, all: LogRecord[]): Promise<{ path: string;
   const paths = new Set<string>()
   for (const r of all) if (r.kind === 'note' && r.source === 'reconstructed' && !r.note.commit) for (const f of r.note.files) paths.add(relative(f, root))
   const out: { path: string; text: string }[] = []
-  for (const path of [...paths].slice(0, 12)) {
+  for (const path of [...paths].slice(0, EXPLORE_FILES)) {
     if (sensitive(path) || inloopOwn(path)) continue
     const snap = await snapshot($, root + '/' + path)
     if (snap.exists && !snap.skipped) out.push({ path, text: redact(snap.text).text })
@@ -1009,6 +1009,14 @@ export function register(on: any, pluginOptions: any) {
 
   on('tool.call', { tool: 'mcp__inloop__recap' }, async ($: any, e: any) => {
     const { recap, problems } = cleanRecap(e)
+    // a recap is read like a note: word-for-word translations go back once
+    const words = recapLiterals(recap, settings.language.code)
+    const who = (agentOf(e) ?? 'main') + '|recap'
+    if (words.length && !resent.has(who) && resent.size < SEND_BACKS) {
+      resent.add(who)
+      sentBack.set(String(e.tool_use_id ?? ''), words.map((w) => w.said))
+      return { result: sendBack(words, languageName(settings.language), 'mcp__' + PLUGIN + '__recap', 'recap') }
+    }
     try {
       await append($, { v: SCHEMA, kind: 'recap', ts: now(), session, agent: agentOf(e), turn, id: String(e.tool_use_id ?? 'recap'), recap: redactDeep(recap).value })
     } catch {
@@ -1024,9 +1032,9 @@ export function register(on: any, pluginOptions: any) {
     const t = $.ui.resolve(e)
     const l = labels(settings.language.code)
     const input = e.props.input && typeof e.props.input === 'object' ? e.props.input : {}
-    if (e.props.tool === 'mcp__inloop__recap') return recapCard(t, redactDeep(cleanRecap(input).recap).value, l)
     const back = sentBack.get(e.props.tool_use_id)
     if (back) return sentBackRow(t, back, l)
+    if (e.props.tool === 'mcp__inloop__recap') return recapCard(t, redactDeep(cleanRecap(input).recap).value, l)
     return noteCard(t, redactDeep(cleanNote(input).note).value, numbers.get(e.props.tool_use_id) ?? null, input.source === 'reconstructed', l)
   }).catch(($: any, e: any, next: any) => next(e))
 
@@ -1136,6 +1144,12 @@ export function register(on: any, pluginOptions: any) {
       if (!project && settings.language.source === 'project') said.push(say(after.lang_project_wins, { language: nameOf(settings.language, ui) }))
       if (!hasLabels(lang.code)) said.push(say(after.lang_no_labels, { language: nameOf(lang, ui) }))
       return { text: said.join('\n') }
+    }
+    // onboarding: notes in this project explain for someone new to the codebase; the tour itself
+    // is the /inloop:onboard skill, since a command cannot start a model turn
+    if (command === 'onboard' || command === 'onboarding') {
+      await setSetting($, 'level', 'onboarding', true)
+      return { text: l.onboard_set }
     }
     // "detail" is the first builds' name for the level and still works
     if (command === 'level' || command === 'detail') {

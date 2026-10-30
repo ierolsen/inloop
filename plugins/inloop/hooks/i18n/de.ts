@@ -16,6 +16,7 @@ export const de: Labels = {
     '  /inloop review <Bereich>      beliebige Commits: main.., HEAD~5.., a1b2c3d',
     '  /inloop review all            alle Commits, die inloop aufgezeichnet hat',
     '  /inloop explain [Pfad]        der Code, wie er jetzt ist, mit seinen Erklärungen und warum jede Zeile da ist',
+    '  /inloop onboard               Notizen für Neue in diesem Code, hier; /inloop:onboard führt durch den Code',
     '  /inloop review pr [n]         ein Pull Request, mit gh von GitHub geholt',
     '  /inloop share [Bereich]       eine Seite und ihr Markdown in .inloop/share, zum Anhängen an eine E-Mail',
     '  /inloop share pr [n] [--yes]  eine Vorschau des Kommentars für den Pull Request; --yes sendet ihn',
@@ -250,4 +251,14 @@ export const de: Labels = {
   x_level_desc_essentials: 'Was und warum, nur was der Code nicht selbst zeigt.',
   x_level_desc_design: 'Entscheidungen, Trade-offs und was sie sonst berühren.',
   x_level_desc_big_picture: 'Architektur und langfristige Folgen, ohne Zeilendetails.',
+
+  // onboarding
+  page_setup: 'Ausführen und testen',
+  page_conventions: 'Konventionen',
+  page_questions: 'Teste dich selbst',
+  page_answer: 'Antwort',
+  page_first_tasks: 'Erste Aufgaben',
+  x_glossary: 'Glossar',
+  x_glossary_hint: 'Jeder Begriff, den die Notizen erklären, und wo er vorkommt.',
+  onboard_set: 'Notizen in diesem Projekt erklären jetzt auf der Stufe "Onboarding": jede Änderung sagt auch, wo sie im Code steht und was als Nächstes zu lesen ist. /inloop level reset --project nimmt es zurück.\nDie Tour durch den Code startet mit: /inloop:onboard, oder /inloop:onboard <Ordner> für einen Teil.',
 }

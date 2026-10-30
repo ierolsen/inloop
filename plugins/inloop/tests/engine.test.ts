@@ -539,3 +539,24 @@ test('a note that translates technical terms word for word goes back once; the r
   await $.command.run(command('lang en'))
   expect((await $.tool.call({ ...note({ title: 'X', files: ['x.py'], what: 'Erken durdurma.', why: 'w' }), tool_use_id: 'n5' })).result).toBe('inloop: note 3 saved.')
 })
+
+test('/inloop onboard explains later changes for someone new here, and the recap is checked for its wording like a note', async ($, on) => {
+  const w = worldOf(on, { store: { settings: { language: 'tr' } } })
+  await $.session.start(START)
+  const said = (await $.command.run(command('onboard'))).text
+  expect(said).toStartWith('Bu projede notlar artık "onboarding" seviyesinde')
+  expect(said).toContain('/inloop:onboard')
+  expect(JSON.parse(w.files.get(ROOT + '/.inloop/config.json') ?? '{}').level).toBe('onboarding')
+  const compose = await $.prompt.compose(COMPOSE as any)
+  const rules = compose.sections.find((s: any) => s.id === 'inloop:instructions').text
+  expect(rules).toContain('Level "onboarding": write for a developer who just joined')
+  expect((await $.command.run(command('status'))).text).toContain('onboarding (bu proje)')
+  // a recap with a word-for-word translation goes back once, then the reworded one is saved
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  const first = await $.tool.call({ tool: 'mcp__inloop__recap', tool_use_id: 'r1', overview: 'Veri tekrarlanabilir biçimde bölünür.', reading_order: [] } as any)
+  expect(first.result).toStartWith('inloop: the recap is not saved yet.')
+  expect(w.records().filter((r) => r.kind === 'recap')).toEqual([])
+  const second = await $.tool.call({ tool: 'mcp__inloop__recap', tool_use_id: 'r2', overview: 'Veri reproducible şekilde split edilir.', reading_order: [], outcomes: [{ note: 1, says: 'Testler geçti.' }] } as any)
+  expect(second.result).toBe('inloop: recap saved.')
+  expect(w.records().filter((r) => r.kind === 'recap').map((r) => r.recap.outcomes)).toEqual([[{ note: 1, says: 'Testler geçti.' }]])
+})

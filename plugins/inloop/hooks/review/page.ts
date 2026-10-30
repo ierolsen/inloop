@@ -272,6 +272,23 @@ function overview(c: Ctx): string {
       return '<li>' + (page ? '<a href="#' + page.id + '"><code>' + esc(page.path) + '</code></a>' : '<code>' + esc(file) + '</code>') + ' ' + span(why) + '</li>'
     }).join('') + '</ol></section>')
   }
+  // an onboarding guide's parts, from the recaps that hold them
+  const all = <T,>(pick: (x: Review['recaps'][number]) => T[]) => r.recaps.flatMap(pick)
+  const setup = all((x) => x.setup)
+  const conventions = all((x) => x.conventions)
+  const questions = all((x) => x.questions)
+  const tasks = all((x) => x.first_tasks)
+  if (setup.length) main.push('<section class="guide"><h3>' + esc(l.page_setup) + '</h3><ol class="steps rich">' + setup.map((s) => '<li>' + span(s) + '</li>').join('') + '</ol></section>')
+  if (conventions.length) main.push('<section class="guide"><h3>' + esc(l.page_conventions) + '</h3><ul class="rich">' + conventions.map((s) => '<li>' + span(s) + '</li>').join('') + '</ul></section>')
+  if (questions.length) {
+    main.push('<section class="guide"><h3>' + esc(l.page_questions) + '</h3><ol class="quiz">' + questions.map((q) =>
+      '<li><p class="q">' + span(q.q) + '</p><details><summary>' + esc(l.page_answer) + '</summary><div class="rich">' + rich(q.a) + '</div></details></li>').join('') + '</ol></section>')
+  }
+  if (tasks.length) {
+    side.push('<section><h3>' + esc(l.page_first_tasks) + '</h3><ul class="check">' + tasks.map((k, i) =>
+      '<li><input type="checkbox" id="t' + i + '"><label for="t' + i + '">' + span(k) + '</label></li>').join('') + '</ul></section>')
+  }
+  if (glossary(c).length) side.push('<section><h3>' + esc(l.x_glossary) + '</h3><p><a href="#glossary">' + esc(l.x_glossary_hint) + '</a></p></section>')
   if (r.checks.length) {
     side.push('<section><h3>' + esc(l.page_check) + '</h3><ul class="check">' + r.checks.map((k, i) =>
       '<li><input type="checkbox" id="k' + i + '"><label for="k' + i + '">' + span(k) + '</label></li>').join('') + '</ul></section>')
@@ -445,6 +462,26 @@ function indexRows(c: Ctx): string[] {
 }
 const hasIndex = (c: Ctx) => [...c.shown.values()].some((g) => g.notes.some((r) => r.record.note.symbols.length))
 
+// Every term the notes on the page explain, once, in alphabetical order, with the views it comes up in
+function glossary(c: Ctx): { term: string; means: string; where: Group[] }[] {
+  const byTerm = new Map<string, { term: string; means: string; where: Group[] }>()
+  for (const g of c.shown.values()) for (const ref of g.notes) for (const t of ref.record.note.terms) {
+    const key = t.term.trim().toLowerCase()
+    const entry = byTerm.get(key) ?? { term: t.term.trim(), means: t.means, where: [] }
+    if (!entry.where.includes(g)) entry.where.push(g)
+    byTerm.set(key, entry)
+  }
+  return [...byTerm.values()].sort((a, b) => a.term.localeCompare(b.term, c.code ?? 'en', { sensitivity: 'base' }))
+}
+
+function glossaryView(c: Ctx): string {
+  const { l } = c
+  const entries = glossary(c)
+  if (!entries.length) return ''
+  return '<section class="view" id="glossary" data-in-print><h2>' + esc(l.x_glossary) + '</h2>' + hint(l.x_glossary_hint) + '<dl class="terms glossary">' + entries.map((e) =>
+    '<dt>' + esc(e.term) + '</dt><dd><div class="rich">' + rich(e.means) + '</div><p class="where">' + e.where.map((g) => '<a href="#' + g.id + '">' + esc(heading(g, l)) + '</a>').join(' &middot; ') + '</p></dd>').join('') + '</dl></section>'
+}
+
 function indexView(c: Ctx): string {
   const { l } = c
   const rows = indexRows(c)
@@ -501,6 +538,7 @@ function sidebar(c: Ctx): string {
     items.push('<li><a href="#' + g.id + '"><span class="sha">' + (g.kind === 'commit' ? short(g.sha) : '&middot;&middot;&middot;') + '</span><span class="t">' + esc(heading(g, l)) + '</span></a></li>')
   }
   if (hasIndex(c)) items.push('<li><a href="#index"><span class="t">' + esc(l.page_index) + '</span></a></li>')
+  if (glossary(c).length) items.push('<li><a href="#glossary"><span class="t">' + esc(l.x_glossary) + '</span></a></li>')
   const scope = '<details class="scope"><summary><span class="k">' + esc(l.x_scope) + ':</span><span class="v">' + esc(scopeName(c)) + '</span></summary><ul class="menu">' + items.join('') + '</ul></details>'
   const find = '<div class="findrow"><input class="find" type="search" placeholder="' + esc(l.x_go_to_file) + '" aria-label="' + esc(l.x_go_to_file) + '" autocomplete="off" spellcheck="false"><kbd>t</kbd></div>' +
     '<p class="no-match" hidden>' + esc(l.x_no_match) + '</p>'
@@ -555,7 +593,8 @@ export function render(r: Review, x: Explorer, l: Labels, o: Options, trim: Trim
     views.push(commitView(g, c, i > 0 ? timeline[i - 1] : null, i >= 0 ? timeline[i + 1] ?? null : null))
   }
   views.push(indexView(c))
-  const known = (id: string) => id === 'overview' || id === 'd-root' || shown.has(id) || x.files.some((p) => p.id === id) || (id.startsWith('d-') && folders(x.root).some((n) => dirId(n.path) === id))
+  views.push(glossaryView(c))
+  const known = (id: string) => id === 'overview' || id === 'd-root' || id === 'glossary' || shown.has(id) || x.files.some((p) => p.id === id) || (id.startsWith('d-') && folders(x.root).some((n) => dirId(n.path) === id))
   const start = o.start && known(o.start) ? o.start : 'overview'
   const foot = '<footer>inloop ' + esc(o.version) + ' &middot; <code>' + esc(o.command) + '</code> &middot; ' + esc(when(o.made, o.code)) + '</footer>'
   const body = appbar(c) + levelDialog(c) + '\n<input type="checkbox" id="drawer" class="drawer-toggle" aria-hidden="true" tabindex="-1"><label class="scrim" for="drawer" aria-hidden="true"></label>\n<div class="app">' + sidebar(c) +

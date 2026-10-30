@@ -162,7 +162,16 @@ export const RECAP_SPEC = {
         type: 'object',
         properties: { note: { type: 'integer', description: 'The number inloop gave the note when it saved it.' }, says: text('What happened, with the numbers.') },
         required: ['note', 'says'],
-      }),    },
+      }),
+      setup: list('Onboarding only: how to install, run, test and debug the project, each a step with its command.', { type: 'string' }),
+      conventions: list('Onboarding only: the rules the code follows, such as naming, structure, error handling, tests, commits.', { type: 'string' }),
+      questions: list('Onboarding only: questions a newcomer answers to check they understood the codebase, each with its answer.', {
+        type: 'object',
+        properties: { q: text('The question.'), a: text('The answer, pointing to the files.') },
+        required: ['q', 'a'],
+      }),
+      first_tasks: list('Onboarding only: small, safe changes a newcomer can make first, each touching a main part of the code.', { type: 'string' }),
+    },
     required: ['overview', 'reading_order'],
   },
 }

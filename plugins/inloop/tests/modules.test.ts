@@ -206,6 +206,22 @@ test('word-for-word translations of technical terms are found in a note\'s prose
   expect(said).toContain('Call `mcp__inloop__note` again with the same note')
 })
 
+test('a recap carries outcomes and an onboarding guide; one an earlier inloop wrote reads back with them empty', async () => {
+  const { recap, problems } = cleanRecap({
+    overview: 'Done.', reading_order: [{ file: 'a.py', why: 'start' }],
+    outcomes: [{ note: 3, says: 'MAE fell from 30,873 to 29,877.' }, { note: 'x', says: 'dropped' }, { note: 2, says: '' }],
+    setup: ['`make test` runs the tests'], conventions: ['snake_case'], questions: [{ q: 'Where does a request start?', a: 'In `app.py`.' }, { q: 'no answer' }],
+    first_tasks: ['Add a field to the health check'],
+  })
+  expect(problems).toEqual([])
+  expect(recap.outcomes).toEqual([{ note: 3, says: 'MAE fell from 30,873 to 29,877.' }])
+  expect(recap.questions).toEqual([{ q: 'Where does a request start?', a: 'In `app.py`.' }])
+  expect([recap.setup, recap.conventions, recap.first_tasks]).toEqual([['`make test` runs the tests'], ['snake_case'], ['Add a field to the health check']])
+  const old = { v: 1, kind: 'recap', ts: 1, session: 's', agent: null, turn: null, id: 'r', recap: { overview: 'Earlier.', reading_order: [], groups: [], check_by_hand: [] } } as any
+  const back = parse(line(old))[0] as any
+  expect([back.recap.outcomes, back.recap.setup, back.recap.questions, back.recap.overview]).toEqual([[], [], [], 'Earlier.'])
+})
+
 test('the onboarding level is the most detailed, and is found by its other names', async () => {
   expect(level('onboard')).toBe('onboarding')
   expect(level('Onboarding')).toBe('onboarding')

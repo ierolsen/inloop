@@ -3,7 +3,7 @@
 // knows: an example for the instructions, and the translations developers do not use, which send
 // a note back once (see register.ts). Plain module.
 
-import type { Note } from './note.ts'
+import type { Note, Recap } from './note.ts'
 
 // A translation developers do not use: where it starts (a stem; any ending may follow), the term
 // they use, and when the stem has an everyday meaning too, which meaning is meant
@@ -114,7 +114,15 @@ function prose(n: Note): string[] {
   for (const u of n.uses) out.push(u.why)
   for (const p of n.parameters) out.push(p.meaning, p.why_this_value ?? '')
   for (const x of [...n.lines, ...n.removed]) out.push(x.says)
-  return out.map((t) => t.replace(/`[^`\n]*`/g, ' '))
+  return out.map(uncoded)
+}
+
+const uncoded = (t: string) => t.replace(/`[^`\n]*`/g, ' ')
+
+// The prose of a recap: everything but file paths
+function recapProse(r: Recap): string[] {
+  return [r.overview, ...r.reading_order.map((x) => x.why), ...r.check_by_hand, ...r.outcomes.map((o) => o.says), ...r.setup, ...r.conventions,
+    ...r.questions.flatMap((q) => [q.q, q.a]), ...r.first_tasks].map(uncoded)
 }
 
 export type Found = { said: string; use: string; when: string | null }
@@ -123,12 +131,15 @@ export type Found = { said: string; use: string; when: string | null }
 // and the term developers use. Empty for a language inloop has no list for. Longer phrases are
 // listed first, and a match is blanked out, so "ortalama kare hata" is not found again inside
 // "karekök ortalama kare hata".
-export function literals(n: Note, code: string | null): Found[] {
+export const literals = (n: Note, code: string | null): Found[] => literalsIn(prose(n), code)
+export const recapLiterals = (r: Recap, code: string | null): Found[] => literalsIn(recapProse(r), code)
+
+function literalsIn(texts: string[], code: string | null): Found[] {
   const g = code ? GUIDES[code] : undefined
   if (!g) return []
   const found: Found[] = []
   const seen = new Set<string>()
-  for (const text of prose(n)) {
+  for (const text of texts) {
     let low = g.lower(text)
     for (const lit of g.literals) {
       const at = new RegExp('(^|[^\\p{L}])' + lit.stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\p{L}*', 'u').exec(low)
@@ -145,8 +156,8 @@ export function literals(n: Note, code: string | null): Found[] {
 }
 
 // What the note tool says back to Claude about them, in English like the rest of the instructions
-export function sendBack(found: Found[], language: string, tool: string): string {
+export function sendBack(found: Found[], language: string, tool: string, what: 'note' | 'recap' = 'note'): string {
   const pairs = found.map((f) => '"' + f.said + '" -> ' + f.use + (f.when ? ' (when it means ' + f.when + ')' : ''))
-  return 'inloop: the note is not saved yet. Developers who write ' + language + ' use the technical term for these words: ' + pairs.join(', ') +
-    '. Call `' + tool + '` again with the same note, those words written the way developers write them, and then make the change.'
+  return 'inloop: the ' + what + ' is not saved yet. Developers who write ' + language + ' use the technical term for these words: ' + pairs.join(', ') +
+    '. Call `' + tool + '` again with the same ' + what + ', those words written the way developers write them' + (what === 'note' ? ', and then make the change.' : '.')
 }

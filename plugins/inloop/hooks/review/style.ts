@@ -265,6 +265,16 @@ dl.terms dd { margin: 0; min-width: 0; }
 .outcome-box { background: var(--outcome); border-left: 3px solid var(--outcome-line); }
 .why-box > b, .outcome-box > b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 2px; }
 .outcome-box ul { margin: 0; padding-left: 18px; }
+section.guide { margin: 0 0 22px; max-width: 900px; }
+ol.steps { margin: 0; padding-left: 22px; }
+ol.steps li { margin: 0 0 6px; }
+ol.quiz { margin: 0; padding-left: 22px; }
+ol.quiz li { margin: 0 0 12px; }
+ol.quiz .q { margin: 0 0 4px; font-weight: 600; }
+ol.quiz details summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+ol.quiz details .rich { margin-top: 6px; padding: 8px 12px; border-left: 3px solid var(--line); }
+dl.glossary { grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 10px 18px; max-width: 980px; }
+dl.glossary .where { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
 .missed { margin-top: 12px; font-size: 15px; }
 .missed ul { margin: 6px 0 0; padding-left: 20px; }
 .missed li .head { display: flex; gap: 8px; align-items: baseline; }
@@ -355,6 +365,7 @@ ${levels}
   .mode, .tools > button:not(.lvl-btn) { display: none; }
   .lvl-btn .k { display: none; }
   .lvl-modal { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 14px 14px 0 0; max-height: 85vh; }
+  dl.glossary { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .drawer-btn { padding: 5px 8px; }
   .drawer-btn .t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .seg button { padding: 5px 8px; }

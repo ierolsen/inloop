@@ -61,5 +61,7 @@ export function recapCard(t: any, recap: Recap, l: Labels): any {
   }
   if (recap.check_by_hand.length) parts.push(block(t, l.page_check, list(recap.check_by_hand)))
   if (recap.outcomes.length) parts.push(block(t, l.card_outcomes, list(recap.outcomes.map((o) => say(l.page_in_note, { n: o.note }) + ': ' + o.says))))
+  if (recap.setup.length) parts.push(block(t, l.page_setup, recap.setup.map((s, i) => i + 1 + '. ' + s).join('\n')))
+  if (recap.first_tasks.length) parts.push(block(t, l.page_first_tasks, list(recap.first_tasks)))
   return frame(t, parts)
 }

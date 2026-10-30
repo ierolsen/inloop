@@ -18,6 +18,7 @@ export const en = {
     '  /inloop review <range>        any commits: main.., HEAD~5.., a1b2c3d',
     '  /inloop review all            every commit inloop recorded',
     '  /inloop explain [path]        the code as it stands with its explanations, and why each line is there',
+    '  /inloop onboard               notes for someone new to this codebase, here; /inloop:onboard tours the code',
     '  /inloop review pr [n]         a pull request, fetched from GitHub with gh',
     '  /inloop share [range]         a page and its Markdown in .inloop/share, to attach to an email',
     '  /inloop share pr [n] [--yes]  a preview of a comment for the pull request; --yes posts it',
@@ -253,6 +254,16 @@ export const en = {
   x_level_desc_essentials: 'What and why, only what the code does not show by itself.',
   x_level_desc_design: 'Decisions, trade-offs and what else they affect.',
   x_level_desc_big_picture: 'Architecture and long-term consequences, no line detail.',
+
+  // onboarding
+  page_setup: 'Run and test',
+  page_conventions: 'Conventions',
+  page_questions: 'Check yourself',
+  page_answer: 'Answer',
+  page_first_tasks: 'First tasks',
+  x_glossary: 'Glossary',
+  x_glossary_hint: 'Every term the notes explain, and where it comes up.',
+  onboard_set: 'Notes in this project now explain at the level "onboarding": each change also says where it sits in the codebase and what to read next. /inloop level reset --project undoes it.\nTo start the tour of the codebase: /inloop:onboard, or /inloop:onboard <folder> for one part.',
 }
 
 export type Labels = typeof en

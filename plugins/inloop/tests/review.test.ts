@@ -388,3 +388,18 @@ test('a dialog chooses the level: every level with what it shows, the notes\' ow
   expect(html).toContain('<button type="button" data-level-choice="onboarding" aria-pressed="false"><span class="n">onboarding</span><span class="d">Projeye yeni katılan için')
   expect(html).not.toContain('<select')
 })
+
+test('an onboarding guide and a glossary fill the overview', async () => {
+  const guide = rec('recap', { id: 'r2', recap: {
+    overview: 'A small shop.', reading_order: [], groups: [], check_by_hand: [],
+    setup: ['`make run` starts the shop'], conventions: ['Classes are nouns.'], questions: [{ q: 'Where is the area computed?', a: 'In `shapes.py`.' }], first_tasks: ['Add a Square class'],
+  } })
+  const r = build(source({ records: [...OUTCOME_RECORDS(), guide] }))
+  const html = render(r, explore(r, STATES as any, INFO), labels('tr'), OPTIONS)
+  linksHold(html)
+  for (const word of ['Kurulum ve çalıştırma', '<code>make run</code> starts the shop', 'Konvansiyonlar', 'Kendini test et', '<p class="q">Where is the area computed?</p><details><summary>Cevap</summary>', 'İlk görevler', 'Add a Square class', 'Terimler sözlüğü']) {
+    expect(html, word).toContain(word)
+  }
+  expect(html).toContain('<section class="view" id="glossary" data-in-print><h2>Terimler sözlüğü</h2>')
+  expect(html).toContain('<dt>random seed</dt><dd><div class="rich"><p>the start of a random sequence</p></div><p class="where"><a href="#c-b2b2b2b2">Shapes</a></p></dd>')
+})
