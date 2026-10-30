@@ -201,7 +201,7 @@ seniority. Each tag names parts of a note (`hooks/parts.ts`); every note keeps i
 
 | Tag | Adds | For |
 |---|---|---|
-| `summary` | nothing more | the cheapest: what happened and why |
+| `summary` | nothing more | the point: what happened and why |
 | `review` (default) | `lines` a reviewer stops at, `removed`, `symbols`, `alternatives`, `impact`, `risks` | accepting a change |
 | `learn` | `lines`, `removed`, `symbols`, `uses`, `parameters`, `terms` | learning the code |
 | `decisions` | `alternatives`, `impact`, `risks` | design review |

@@ -31,7 +31,7 @@
     "tags": {
       "type": "string",
       "title": "Tags",
-      "description": "What the notes hold, as tags combined with commas: summary (the point, what and why; the cheapest), review (what a reviewer needs), learn (line by line, imports, parameters, terms), decisions (trade-offs and options weighed), architecture (system-level consequences), onboarding (learn, plus where the code sits in the codebase), all (everything; the most expensive). Tag names are English in every language.",
+      "description": "What the notes hold, as tags combined with commas: summary (the point of each change, what and why), review (what a reviewer needs; the default), learn (line by line, imports, parameters, terms), decisions (trade-offs and options weighed), architecture (system-level consequences), onboarding (learn, plus where the code sits in the codebase), all (everything the other tags hold). Tag names are English in every language.",
       "default": "review"
     },
     "adhd": {
