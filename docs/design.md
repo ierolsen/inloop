@@ -196,7 +196,9 @@ a term to be explained, never translated.
 ### Levels and terms
 
 `/inloop level <level>` sets how the notes explain, as a kind of explanation rather than a reader's
-seniority: `full` (nearly every line, every term in `terms`, every parameter), `guided` (the lines
+seniority: `onboarding` (everything `full` asks, plus where each change sits in the codebase, the
+flow it belongs to, the conventions it follows and the files to read next), `full` (nearly every
+line, every term in `terms`, every parameter), `guided` (the lines
 that carry the logic, the patterns named), `essentials` (what the code does not show by itself),
 `design` (decisions, trade-offs, alternatives and `impact`) and `big-picture` (architecture and
 consequences, no line detail). The levels before this one, `brief`, `standard` and `deep`, still
@@ -222,6 +224,37 @@ the verbs and properties around it. So:
   spans, line quotes and the glossary are not checked, and stems with an everyday meaning too
   (Turkish "karıştır") say which meaning is meant. The sent-back call's row shows one line instead
   of a card.
+
+On the page the level is chosen in a dialog (`<dialog>`, a sheet from the bottom on a phone):
+each level with one line on what it shows, the notes' own level marked. Esc, a click outside and
+the close button shut it and give focus back to its button. A browser's own dropdown said nothing
+about the levels.
+
+### Reasons, and what happened after
+
+A comment on a deleted line once read "the function is deleted, nothing replaces it", which the
+red line already says. The `removed` field now asks for the cause for that line: what made it
+unnecessary, wrong or replaceable, who still used it, and the evidence, with a bad and a good
+example in the instructions. The next run's comments named the cause ("n_estimators' counterpart
+is max_iter, and early stopping sets it; learning_rate=0.1 is HGB's default").
+
+A note is written before its change, so it cannot hold what the change turned out to do. The
+recap's `outcomes` carry that, each by the number inloop gave its note in the session ("note 3
+saved"), and the page shows them under the note and, with the note's point and reason, above the
+diff in the file's Changes tab.
+
+### Onboarding
+
+`/inloop:onboard [folder]` is a skill, not a command: Claude Code refuses `prompt.submit` and
+`command.run` from a command hook ("it would wait on the turn this hook is holding"), so a command
+cannot start the model turn a tour needs. The skill has Claude read in a set order (docs, build
+and CI files, structure, entry points, flows, tests, history), change nothing, and write at most
+20 reconstructed notes: the project as a whole, each main flow traced from its entry point to its
+end, then the modules a newcomer must know. Its recap is a guide: `reading_order` as the learning
+path, `setup` with commands found in the repository, `conventions`, `questions` with answers,
+`first_tasks`, and in `check_by_hand` what to ask the team. `/inloop explain` shows the guide on its
+overview and every term in a glossary view. `/inloop onboard` sets the project's level to
+`onboarding`, so later changes are explained the same way.
 
 ### Explaining code that already exists
 

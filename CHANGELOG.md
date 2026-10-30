@@ -24,8 +24,13 @@ The first version.
 - `/inloop share pr [n]`: a comment for the pull request, commit by commit, previewed first;
   `--yes` posts it or updates inloop's earlier comment, through your own `gh`.
 - `/inloop:annotate`: explanations of existing code and of past commits.
-- Five levels of explanation (`/inloop level`), from `full` to `big-picture`; the page can hide
-  detail down to the big picture.
+- `/inloop:onboard`: a tour of an existing codebase for someone new to it, ending with a guide
+  (reading path, setup, conventions, questions, first tasks); `/inloop onboard` sets the level for
+  the project.
+- Six levels of explanation (`/inloop level`), from `onboarding` to `big-picture`; on the page, a
+  dialog hides detail down to the big picture.
+- Comments on deleted lines give the reason each one goes; a recap's outcomes say what was found
+  after a note's change, under the note and in the file's Changes.
 - Technical words kept as developers say them in every language (names, verbs and properties),
   with a glossary in each note; for Turkish, German and Dutch, a note with a word-for-word
   translation is sent back once to be reworded.

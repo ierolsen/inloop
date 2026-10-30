@@ -22,7 +22,10 @@ want, and in an ADHD-friendly form if you want.
   the note that explains that commit. Each commit has its own page too, with its reason first.
 - **Line by line.** Comments on the lines a reader would stop at, the class and function cards at
   the line that defines them, and what was imported from elsewhere at the import, with links
-  between files. Deleted lines get a comment too: why each one goes and what replaces it.
+  between files. Deleted lines get a comment too: the reason each one goes, not just that it does.
+- **What happened after.** A note is written before its change, so what Claude learns afterwards
+  (a test result, a measurement) comes back as the note's outcome. A file's Changes tab shows,
+  above each diff, the point of the change, its reason and its outcome.
 - **Any commits, any time.** `/inloop review main..` for a branch, `/inloop review HEAD~10..` for
   the last ten commits, `/inloop review a1b2c3d` for one.
 - **The code as it stands.** `/inloop explain src/app.py` opens the same page on one file or
@@ -37,9 +40,15 @@ want, and in an ADHD-friendly form if you want.
 - **Code you did not watch being written.** `/inloop:annotate` asks Claude to explain existing
   code, a folder, or a range of commits after the fact, in the same format, marked as explained
   afterwards.
-- **Five levels of detail.** From `full` (nearly every line explained, every term defined) through
-  `guided`, `essentials` and `design` to `big-picture` (architecture and consequences only). The
-  page can switch to a higher level to hide detail.
+- **Onboarding onto a codebase.** New on a team? `/inloop:onboard` has Claude read the project and
+  walk you through it, without changing it: what it does, its parts, each main flow from its entry
+  point to its end, then a guide with the files to read in order, how to run and test it, its
+  conventions, questions to check yourself, and first tasks. `/inloop onboard` keeps explaining
+  every later change for a newcomer.
+- **Six levels of detail.** From `onboarding` (every line, and where it sits in the codebase) and
+  `full` (nearly every line explained, every term defined) through `guided`, `essentials` and
+  `design` to `big-picture` (architecture and consequences only). On the page, a dialog switches
+  to a higher level to hide detail.
 - **Technical words stay technical.** A note in Turkish says "satırları shuffle edip split eder"
   and "random_state ile reproducible", as Turkish developers do, never a word-for-word translation,
   and explains the terms in a glossary. A note that slips is sent back once to be reworded.
@@ -80,8 +89,10 @@ To try it in one session without installing, clone this repository and run
 | `/inloop share pr [n]` | A preview of a comment for the pull request; add `--yes` to post it |
 | `/inloop review ... --theme light` | The page with a fixed theme, to share or print (`dark` also works) |
 | `/inloop:annotate <target>` | Claude explains existing code: a file, a folder, a function, a commit range |
+| `/inloop:onboard [folder]` | Claude walks a newcomer through the codebase, with a guide to it |
+| `/inloop onboard` | Notes in this project explain for someone new to the codebase |
 | `/inloop lang <language>` | The language of the notes, for all your projects (`--project` for this one) |
-| `/inloop level <level>` | How the notes explain: `full`, `guided`, `essentials`, `design` or `big-picture` |
+| `/inloop level <level>` | How the notes explain: `onboarding`, `full`, `guided`, `essentials`, `design` or `big-picture` |
 | `/inloop adhd on` | The ADHD-friendly form; `off` to go back |
 | `/inloop on`, `/inloop off` | Ask Claude for notes in this session, or stop |
 | `/inloop status` | What was recorded, and which settings are in effect |
@@ -89,8 +100,9 @@ To try it in one session without installing, clone this repository and run
 The language, the level and the ADHD form can also be set in `/config`. A project's own choice
 comes first, then yours across projects, then the plugin setting.
 
-On the page, `t` jumps to "Go to file", the level switch hides detail, and "Everything as PDF"
-prints every commit (or, for `/inloop explain`, every file) in one go.
+On the page, `t` jumps to "Go to file", the level dialog hides detail, the glossary lists every
+term the notes explain, and "Everything as PDF" prints every commit (or, for `/inloop explain`,
+every file) in one go.
 
 ## How it works
 
