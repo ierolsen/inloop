@@ -19,7 +19,7 @@ test('a session writes nothing until it records something; then .inloop/ keeps i
   await $.tool.call(note({ title: 'First', files: ['a.py'], what: 'w', why: 'y' }))
   expect(w.files.get(ROOT + '/.inloop/.gitignore')).toBe('*\n')
   expect(w.records().map((r) => r.kind)).toEqual(['session', 'baseline', 'note'])
-  expect(w.records()[0]).toMatchObject({ v: 1, session: SESSION_ID, root: ROOT, language: 'English', language_code: 'en', tags: ['review'], version: '0.1.0' })
+  expect(w.records()[0]).toMatchObject({ v: 1, session: SESSION_ID, root: ROOT, language: 'English', language_code: 'en', tags: ['review'], version: '0.1.1' })
   expect(w.records()[1]).toMatchObject({ git: false, head: null, dirty: [] })
 })
 
@@ -577,7 +577,7 @@ test('/inloop review pr fetches the pull request into its own ref and reviews it
   expect(w.ran.filter((c) => c.startsWith('git fetch'))).toEqual(['git fetch --no-tags --quiet origin +refs/pull/7/head:' + REF])
   const html = w.files.get(page) ?? ''
   expect(html).toContain('Pull request #7: Add shapes')
-  expect(html).toContain('<footer>inloop 0.1.0 &middot; <code>/inloop review pr 7</code> &middot; ')
+  expect(html).toContain('<footer>inloop 0.1.1 &middot; <code>/inloop review pr 7</code> &middot; ')
   expect(html).toContain('area is width times height')
   expect(html).toContain('<section class="view" id="' + fileId('shapes.py') + '"')
   expect((await $.command.run(command('review pr x'))).text).toStartWith('Use `/inloop share`')

@@ -21,7 +21,7 @@ import { noteCard, recapCard, sentBackRow } from './live/card.ts'
 import { literals, recapLiterals, sendBack } from './jargon.ts'
 
 const PLUGIN = 'inloop'
-const VERSION = '0.1.0'
+const VERSION = '0.1.1'
 const SECTION = PLUGIN + ':instructions'
 const READ_MAX = 1_000_000 // bytes of a file read for a diff; larger files are logged without one
 const DIFF_LINES = 400

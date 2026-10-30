@@ -1,7 +1,7 @@
 {
   "name": "inloop",
   "displayName": "inloop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Stay in the loop with the code your agent writes. Before each change Claude writes a short, structured note: what it does, why, its parameters and why each new class or function exists. You read the notes live while Claude works and later as a review page, in the language you choose.",
   "author": {
     "name": "Erol Sen",

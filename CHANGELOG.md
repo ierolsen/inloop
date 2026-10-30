@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.1 (2026-10-30)
+
+Changes for Anthropic's plugin directory, whose checks read a mod's code as written.
+
+- inloop runs no script interpreter. `/inloop share mail` reads which app opens `mailto:` links
+  from macOS's Launch Services settings with `defaults export`; `/inloop share copy` selects the
+  page in Finder to copy (Cmd+C) and paste, or to drag, instead of putting it on the clipboard.
+- inloop reads no environment variable.
+- Redaction no longer leaves values that look like environment lookups: every value of a
+  secret's name goes, since a value shaped like a reference can be a secret too.
+- The "gh needed" message says to install gh and sign in, without a link.
+- The plugin folder has its own README, which says everything inloop writes, runs and sends, and
+  what each hook changes; `SECURITY.md` says how to report a vulnerability.
+- No change to what the notes hold or how the pages look.
+
 ## 0.1.0 (2026-10-30)
 
 The first version.
@@ -20,8 +35,8 @@ The first version.
 - `/inloop review pr [n]`: a pull request, fetched into `refs/inloop/pr-<n>` and reviewed as it
   stands there.
 - `/inloop share`: asks where the review goes. `share mail` opens a new message in your mail app
-  with the page attached (on a Mac), `share copy` selects the page in the file manager to paste
-  or drag into Slack, Teams or a chat, and `share file` writes the page and its Markdown to
+  with the page attached and `share copy` puts the page on the clipboard to paste into Slack,
+  Teams or a chat (both on a Mac); `share file` writes the page and its Markdown to
   `.inloop/share/` and shows them in the file manager.
 - `/inloop status` (or `/inloop` alone) shows each setting with the command that changes it and
   the commands to go on with.
