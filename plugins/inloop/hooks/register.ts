@@ -677,9 +677,10 @@ function modelOf(s: Scope, all: LogRecord[], explained: { path: string; text: st
   return buildReview({ records: all, commits: s.found.commits, more: s.found.more, pending: s.pending, explained, git, scope: s.scope, range: s.range, pr: s.pr ?? null, project: project() })
 }
 
-// The tags a page or its Markdown shows: those the notes were written with (else the setting's),
-// and the ones naming parts a skill wrote beyond them
-const shownTags = (model: Review) => tagsShowing(model.written ?? settings.tags.value, model.present)
+// The tags the notes were written with, else the setting's; and the tags a page or its Markdown
+// shows: those, and the ones naming parts a skill wrote beyond them
+const chosenTags = (model: Review) => model.written ?? settings.tags.value
+const shownTags = (model: Review) => tagsShowing(chosenTags(model), model.present)
 
 // command: the command as the person would type it again, for the page's footer
 type Page = { theme: Theme; mode: Mode; extra: string[]; start: string | null; command: string }
@@ -690,7 +691,7 @@ async function pageOf($: any, model: Review, end: string | null, page: Page): Pr
   const { states, info } = await fileStates($, model, end, page.extra)
   const explorer = explore(model, states, info)
   return fitReview(model, explorer, labels(code), {
-    code, theme: page.theme, version: VERSION, tags: shownTags(model), written: !!model.written, mode: page.mode, start: page.start,
+    code, theme: page.theme, version: VERSION, tags: shownTags(model), chosen: chosenTags(model), written: !!model.written, mode: page.mode, start: page.start,
     command: page.command, made: now(),
   })
 }

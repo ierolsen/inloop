@@ -21,9 +21,10 @@ import { folders, fileId, dirId, covers, UNCOMMITTED, type Explorer, type FilePa
 
 export const PAGE_BYTES = 3_800_000 // under the 4 MiB a mod may write in one file
 export type Mode = 'review' | 'explain'
-// tags: the tags the page opens with; written: whether the logs say the notes were written with them;
+// tags: the tags the page opens with, which can name more than chosen when a skill wrote more;
+// chosen: the tags the notes were written with, or the setting's; written: whether the logs say so;
 // command and made: the command that wrote the page and when, for its footer
-export type Options = { code: string | null; theme: Theme; version: string; tags: Tag[]; written: boolean; mode: Mode; start: string | null; command: string; made: number }
+export type Options = { code: string | null; theme: Theme; version: string; tags: Tag[]; chosen: Tag[]; written: boolean; mode: Mode; start: string | null; command: string; made: number }
 // What fit() has left out so far: the diffs under each file's Changes tab, then the code beside
 // the why view's commits. Both stay on the page elsewhere.
 export type Trim = { changes: boolean; why: boolean }
@@ -504,15 +505,16 @@ function appbar(c: Ctx): string {
     '<button type="button" data-print>' + esc(l.r_print) + '</button><button type="button" data-print-all>' + esc(l.x_print_all) + '</button></div></header>'
 }
 
-// The tags to choose from, each with what it adds; the tags the notes were written with are marked
-// and pressed. Turning tags off hides parts; turning one on shows only what the notes hold.
+// The tags to choose from, each with what it adds; the tags the page opens with are pressed, and
+// those the notes were written with marked. Turning tags off hides parts; turning one on shows only
+// what the notes hold.
 function tagsDialog(c: Ctx): string {
   const { l, o } = c
   const parts = Object.fromEntries(TAGS.map((t) => [t, PARTS_OF[t].note]))
   const items = TAGS.map((t) => '<li><button type="button" data-tag-choice="' + t + '" aria-pressed="' + String(o.tags.includes(t)) + '"><span class="n">' + t + '</span>' +
-    (o.written && o.tags.includes(t) ? badge(l.x_tags_written, 'new') : '') + '<span class="d">' + esc(l[('tag_desc_' + t) as 'tag_desc_review']) + '</span></button></li>')
+    (o.written && o.chosen.includes(t) ? badge(l.x_tags_written, 'new') : '') + '<span class="d">' + esc(l[('tag_desc_' + t) as 'tag_desc_review']) + '</span></button></li>')
   return '\n<dialog class="tags-modal" id="tags" aria-labelledby="tags-title" data-parts="' + esc(JSON.stringify(parts)) + '"><div class="tags-in"><div class="tags-head"><h2 id="tags-title">' + esc(l.x_tags_title) + '</h2>' +
-    '<button type="button" class="x" data-tags-close aria-label="' + esc(l.x_close) + '">&times;</button></div>' + hint(say(o.written ? l.x_tags_hint : l.x_tags_hint_setting, { tags: o.tags.join(', ') })) +
+    '<button type="button" class="x" data-tags-close aria-label="' + esc(l.x_close) + '">&times;</button></div>' + hint(say(o.written ? l.x_tags_hint : l.x_tags_hint_setting, { tags: o.chosen.join(', ') })) +
     '<ul class="tags-list">' + items.join('') + '</ul></div></dialog>'
 }
 

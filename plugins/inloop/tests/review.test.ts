@@ -183,7 +183,7 @@ const STATES = [
   stateOf('docs/old/notes.md', null, null, 'deleted'),
 ]
 const INFO = new Map([['a1a1a1a1', { summary: 'chore: start', time: 1_600_000_000_000 }]])
-const OPTIONS = { code: 'tr', theme: 'auto' as const, version: '0.1.0', tags: ['review', 'learn'] as any, written: true, mode: 'review' as const, start: null, command: '/inloop review', made: 1_700_000_000_000 }
+const OPTIONS = { code: 'tr', theme: 'auto' as const, version: '0.1.0', tags: ['review', 'learn'] as any, chosen: ['review', 'learn'] as any, written: true, mode: 'review' as const, start: null, command: '/inloop review', made: 1_700_000_000_000 }
 
 // Every anchor once, and every link inside the page lands on one: a link to nothing would quietly
 // show the overview instead.
@@ -389,6 +389,11 @@ test('a dialog chooses the tags: every tag in English with what it adds, the tag
   expect(dialog).toContain('<button type="button" data-tag-choice="review" aria-pressed="true"><span class="n">review</span><span class="badge new">yazıldı</span>')
   expect(dialog).toContain('<button type="button" data-tag-choice="summary" aria-pressed="false"><span class="n">summary</span><span class="d">Özü, ne değişti ve neden')
   expect(dialog).toContain('&quot;decisions&quot;:[&quot;alternatives&quot;,&quot;impact&quot;,&quot;risks&quot;]')
+  // a skill wrote learn's parts in a review session: both are pressed, only review is marked written
+  const more = render(r, explore(r, STATES as any, INFO), labels('en'), { ...OPTIONS, chosen: ['review'] }).split('<dialog')[1]
+  expect(more).toContain('<button type="button" data-tag-choice="learn" aria-pressed="true"><span class="n">learn</span><span class="d">')
+  expect(more).toContain('<span class="n">review</span><span class="badge new">written</span>')
+  expect(more).toContain('The notes were written with review. ')
   // with every mark part hidden the code takes the width
   expect(html).toContain('[data-hide~="lines"][data-hide~="removed"][data-hide~="symbols"][data-hide~="uses"][data-hide~="parameters"] .rows { grid-template-columns: minmax(0, 1fr); }')
   expect(html).not.toContain('<select')

@@ -475,7 +475,11 @@ test('parts a skill wrote beyond the tags are on the page and in its Markdown', 
   // /inloop:onboard or /inloop:annotate under the default review tag fills terms, which learn names
   const { w } = await committedShapes($, on, { terms: [{ term: 'dunder method', means: 'a method Python calls for an operator' }] })
   await $.command.run(command('share'))
-  expect(w.files.get(ROOT + '/.inloop/share/inloop-work.html')).toContain('data-tags="review,learn"')
+  const html = w.files.get(ROOT + '/.inloop/share/inloop-work.html') ?? ''
+  expect(html).toContain('data-tags="review,learn"')
+  // the dialog marks only the session's own tag as written
+  expect(html).toContain('<span class="n">review</span><span class="badge new">written</span>')
+  expect(html).toContain('<span class="n">learn</span><span class="d">')
   expect(w.files.get(ROOT + '/.inloop/share/inloop-work.md')).toContain('dunder method')
 })
 
