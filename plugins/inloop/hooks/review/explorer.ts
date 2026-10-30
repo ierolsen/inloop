@@ -13,8 +13,8 @@ export const UNCOMMITTED = '0000000000000000000000000000000000000000'
 // One file as it stands at the end of the review, with who wrote which line
 export type FileState = {
   path: string
-  text: string | null // null for a deleted file, a secret file, a binary or one too large to show
-  hidden: 'sensitive' | 'binary' | 'deleted' | 'too-large' | null
+  text: string | null // null for a deleted file, a secret file, a binary, one too large to show, or one past the page's count
+  hidden: 'sensitive' | 'binary' | 'deleted' | 'too-large' | 'not-shown' | null
   blame: string[] | null // the commit that last changed each line, by line; null without git
 }
 // What blame says about a commit, for commits the review itself does not cover

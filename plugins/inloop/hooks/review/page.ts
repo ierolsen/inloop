@@ -20,7 +20,8 @@ import { folders, fileId, dirId, covers, UNCOMMITTED, type Explorer, type FilePa
 
 export const PAGE_BYTES = 3_800_000 // under the 4 MiB a mod may write in one file
 export type Mode = 'review' | 'explain'
-export type Options = { code: string | null; theme: Theme; version: string; level: Level; mode: Mode; start: string | null }
+// level: the level the page opens at; written: whether the logs say the notes were written at it
+export type Options = { code: string | null; theme: Theme; version: string; level: Level; written: boolean; mode: Mode; start: string | null }
 // What fit() has left out so far: the diffs under each file's Changes tab, then the code beside
 // the why view's commits. Both stay on the page elsewhere.
 export type Trim = { changes: boolean; why: boolean }
@@ -301,6 +302,7 @@ function absent(page: FilePage, c: Ctx): string | null {
   if (s.hidden === 'sensitive') return l.page_skipped_sensitive
   if (s.hidden === 'binary') return l.page_skipped_binary
   if (s.hidden === 'deleted') return l.x_deleted
+  if (s.hidden === 'not-shown') return say(l.x_not_shown, { path: page.path })
   if (s.hidden === 'too-large' || s.text === null) return l.x_too_large
   if (page.tooBig) return l.r_too_big
   return null
@@ -429,7 +431,7 @@ function appbar(c: Ctx): string {
   const { r, l, o } = c
   const theme = '<span class="seg" role="group" aria-label="' + esc(l.r_theme) + '">' + (['auto', 'light', 'dark'] as const).map((t) =>
     '<button type="button" data-theme-choice="' + t + '">' + esc(l[('r_theme_' + t) as 'r_theme_auto']) + '</button>').join('') + '</span>'
-  const level = '<label class="lvl"><span>' + esc(l.x_level) + '</span><select data-level-choice title="' + esc(say(l.x_level_hint, { level: levelName(l, o.level) })) + '">' +
+  const level = '<label class="lvl"><span>' + esc(l.x_level) + '</span><select data-level-choice title="' + esc(say(o.written ? l.x_level_hint : l.x_level_hint_setting, { level: levelName(l, o.level) })) + '">' +
     LEVELS.map((v) => '<option value="' + v + '"' + (v === o.level ? ' selected' : '') + '>' + esc(levelName(l, v)) + '</option>').join('') + '</select></label>'
   return '<header class="appbar"><label class="drawer-btn" for="drawer">' + ICON_MENU + '<span class="t">' + esc(l.x_files) + '</span></label><div class="brand"><a class="logo" href="#overview">inloop</a><span class="mode">' +
     esc(o.mode === 'explain' ? l.x_explain : l.x_review) + '</span><span class="proj">' + esc(r.project) + '</span></div><div class="tools">' + level + theme +

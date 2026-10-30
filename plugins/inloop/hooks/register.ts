@@ -550,15 +550,16 @@ async function fileStates($: any, model: Review, end: string | null, extra: stri
   const add = (p: string) => { if (p && !paths.includes(p) && !inloopOwn(p)) paths.push(p) }
   for (const g of groups) for (const f of g.files) add(f.data.patch.path)
   extra.forEach(add)
-  const noted = (p: string) => groups.some((g) => g.notes.some((r) => covers(r, p)))
-  const keep = new Set([...paths].sort((a, b) => Number(noted(b)) - Number(noted(a))).slice(0, EXPLORE_FILES))
+  // what the reader asked for first, then the files with explanations
+  const rank = (p: string) => (extra.includes(p) ? 2 : groups.some((g) => g.notes.some((r) => covers(r, p))) ? 1 : 0)
+  const keep = new Set([...paths].sort((a, b) => rank(b) - rank(a)).slice(0, EXPLORE_FILES))
   const info = new Map<string, BlameInfo>()
   const states: FileState[] = []
   for (const path of paths) {
     const state: FileState = { path, text: null, hidden: null, blame: null }
     states.push(state)
     if (sensitive(path)) { state.hidden = 'sensitive'; continue }
-    if (!keep.has(path)) { state.hidden = 'too-large'; continue }
+    if (!keep.has(path)) { state.hidden = 'not-shown'; continue }
     let text: string | null = null
     if (end) {
       const sized = await gitRun($, ['git', 'cat-file', '-s', end + ':' + path])
@@ -637,7 +638,7 @@ async function writePage($: any, page: Page, l: Labels): Promise<string> {
   })
   const { states, info } = await fileStates($, model, end, page.extra)
   const explorer = explore(model, states, info)
-  const { html, cut } = fitReview(model, explorer, labels(code), { code, theme: page.theme, version: VERSION, level: settings.level.value, mode: page.mode, start: page.start })
+  const { html, cut } = fitReview(model, explorer, labels(code), { code, theme: page.theme, version: VERSION, level: model.written ?? settings.level.value, written: !!model.written, mode: page.mode, start: page.start })
   const path = root + '/' + REVIEW_DIR + '/' + page.name + (page.theme === 'auto' ? '' : '-' + page.theme) + '.html'
   await keepOutOfGit($)
   await $.fs.write(path, html)

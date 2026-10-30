@@ -381,3 +381,27 @@ test('/inloop review writes the session\'s commits and what is not committed yet
   expect((await $.command.run(command('review nosuch..'))).text).toBe('git does not know "nosuch..". Try a range such as main.. or HEAD~5.., or a commit hash.')
   expect((await $.command.run(command('review --output=x'))).text).toStartWith('git does not know')
 })
+
+test('/inloop explain shows the code of the file asked for, even in a project with more explained files than a page holds', async ($, on) => {
+  const HEAD = 'c3'.repeat(20)
+  const git: Git = { 'git rev-parse --show-toplevel': ROOT + '\n', 'git rev-parse --verify --quiet HEAD': HEAD + '\n', 'git status --porcelain=v1 -z --untracked-files=all': '' }
+  const files: Record<string, string> = { [ROOT + '/asked.py']: 'x = 1\n' }
+  const diffs: string[] = []
+  for (let i = 0; i < 41; i++) {
+    files[ROOT + '/m' + i + '.py'] = 'v = ' + i + '\n'
+    diffs.push('diff --git a/m' + i + '.py b/m' + i + '.py\nindex 1111111..2222222 100644\n--- a/m' + i + '.py\n+++ b/m' + i + '.py\n@@ -1 +1 @@\n-v = 0\n+v = ' + i)
+  }
+  const w = worldOf(on, { git, files })
+  await $.session.start(START)
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  for (let i = 0; i < 41; i++) await $.tool.call({ ...note({ title: 'M' + i, files: ['m' + i + '.py'] }), tool_use_id: 'n' + i })
+  git['git -c core.quotePath=false diff --no-color --no-ext-diff HEAD -W'] = diffs.join('\n') + '\n'
+  const page = ROOT + '/.inloop/review/explain-asked.py.html'
+  expect((await $.command.run(command('explain asked.py'))).text).toBe('The explanation is at ' + page)
+  const html = w.files.get(page) ?? ''
+  const asked = html.split('<section class="view" id="' + fileId('asked.py') + '"')[1].split('</section>')[0]
+  expect(asked).toContain('<td class="c">x = <span class="t-n">1</span></td>')
+  // the page holds the code of 40 files: the one asked for, then the explained ones in order
+  expect(html).toContain('<code>/inloop explain m40.py</code>')
+  expect(html).not.toContain('<code>/inloop explain m38.py</code>')
+})

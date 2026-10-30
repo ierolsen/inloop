@@ -161,6 +161,8 @@ test('commits find their notes by record, by a reconstructed note\'s commit, and
   expect(r.links.get('Rectangle')).toEqual({ href: '#c-b2b2b2b2-f0-1', title: 'holds sizes' })
   expect(r.checks).toEqual(['Run `pytest`.'])
   expect(r.counts.commits).toBe(4)
+  // the session was written before levels had their names: "standard" is "guided"
+  expect(r.written).toBe('guided')
 })
 
 // The files of that history as they stand, and which commit last wrote each line: a later change
@@ -180,7 +182,7 @@ const STATES = [
   stateOf('docs/old/notes.md', null, null, 'deleted'),
 ]
 const INFO = new Map([['a1a1a1a1', { summary: 'chore: start', time: 1_600_000_000_000 }]])
-const OPTIONS = { code: 'tr', theme: 'auto' as const, version: '0.1.0', level: 'guided' as const, mode: 'review' as const, start: null }
+const OPTIONS = { code: 'tr', theme: 'auto' as const, version: '0.1.0', level: 'guided' as const, written: true, mode: 'review' as const, start: null }
 
 // Every anchor once, and every link inside the page lands on one: a link to nothing would quietly
 // show the overview instead.

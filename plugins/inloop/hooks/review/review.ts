@@ -8,6 +8,7 @@ import { sameFile } from '../note.ts'
 import { parseHunks, flat, current, type FilePatch, type Line } from './patch.ts'
 import { place, segments, marks, markKey, type Mark, type Segment } from './anchor.ts'
 import { roleOf, type Role } from './roles.ts'
+import { LEVELS, level as parseLevel, type Level } from '../config.ts'
 
 export type GitCommit = { sha: string; parents: string[]; author: string; time: number; subject: string; body: string; files: FileData[] }
 // A file's patch with what was hidden on the way: secret values, the content of a secret file, or
@@ -57,6 +58,7 @@ export type Review = {
   index: IndexEntry[]
   links: Map<string, { href: string; title: string }> // a defined name to its place, for links from other lines
   counts: { commits: number; files: number; notes: number; unexplained: number }
+  written: Level | null // the most detailed level the notes on the page were written at, when the logs say
 }
 
 export { markKey }
@@ -75,10 +77,15 @@ export function build(src: Source): Review {
   const commits: CommitRecord[] = []
   const recaps: RecapRecord[] = []
   const outside = new Set<string>()
+  const levelOf = new Map<string, Level>() // each session's level, from its first record
   let started: number | null = null
   let n = 0
   for (const r of src.records) {
     if (r.kind === 'session' && started === null) started = r.ts
+    if (r.kind === 'session' && !levelOf.has(r.session)) {
+      const l = parseLevel(r.level ?? r.detail)
+      if (l) levelOf.set(r.session, l)
+    }
     if (r.kind === 'note') notes.set(r.id, { id: r.id, n: ++n, record: r })
     if (r.kind === 'edit' && r.status === 'ok') edits.set(r.id, r)
     if (r.kind === 'commit') commits.push(r)
@@ -179,12 +186,14 @@ export function build(src: Source): Review {
   const used = new Set(all.flatMap((g) => g.notes.map((x) => x.id)))
   const sessions = new Set([...used].map((id) => notes.get(id)!.record.session))
   const relevant = recaps.filter((r) => sessions.has(r.session) || src.scope === 'session')
+  const levels = [...sessions].map((s) => levelOf.get(s)).filter((l): l is Level => !!l)
   return {
     project: src.project, scope: src.scope, range: src.range, git: src.git, started, groups, explained, more: src.more,
     recaps: relevant.map((r) => r.recap),
     checks: [...new Set(relevant.flatMap((r) => r.recap.check_by_hand))],
     index, links,
     counts: { commits: src.commits.length, files: seen.size, notes: used.size, unexplained: all.reduce((k, g) => k + g.files.filter((f) => f.tags.includes('unexplained')).length, 0) },
+    written: levels.length ? LEVELS[Math.min(...levels.map((l) => LEVELS.indexOf(l)))] : null,
   }
 
   function group(kind: Group['kind'], id: string, c: GitCommit | null, index: number, refs: NoteRef[], files: FileData[], outsidePaths: Set<string>, edited: Set<string>): Group {
