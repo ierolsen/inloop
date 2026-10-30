@@ -883,7 +883,7 @@ async function toClipboard($: any, page: string, l: Labels): Promise<string> {
   if (interactive && (await onMac($))) {
     try {
       const argv = ['osascript', '-e', 'on run argv', '-e', 'set the clipboard to (POSIX file (item 1 of argv))', '-e', 'end run', page]
-      if ((await $.process.run(argv, { cwd: root, timeoutMs: 15000 })).exitCode === 0) return l.share_copied
+      if ((await $.process.run(argv, { cwd: root, timeoutMs: 15000 })).exitCode === 0) return say(l.share_copied, { path: page })
     } catch {
       // no clipboard here: drag the file
     }

@@ -240,7 +240,7 @@ export const de: Labels = {
   share_mail_opened: 'In deinem Mailprogramm ist eine neue Nachricht mit der Seite im Anhang offen ({path}): Empfänger eintragen und senden. Die Seite enthält den Code aus dem Review, schick sie nur an Leute, die diesen Code sehen dürfen. Ist dein Mailprogramm nicht eingerichtet, gibt dir `/inloop share file` die Datei für dein Webmail.',
   share_mail_web: 'Deine E-Mail öffnet sich im Browser, und der kann von inloop keine Datei annehmen. Die Seite liegt hier: {path}; häng sie an die E-Mail an.',
   share_mail_attach: 'Die Seite liegt hier: {path}; häng sie an eine E-Mail an. Eine Datei, die offline in jedem Browser aufgeht.',
-  share_copied: 'Die Seite ist in der Zwischenablage: füge sie in Slack, Teams, einen Chat oder eine E-Mail ein. Eine Datei, die offline in jedem Browser aufgeht. Sie enthält den Code aus dem Review, teil sie nur mit Leuten, die diesen Code sehen dürfen.',
+  share_copied: 'Die Seite ist in der Zwischenablage ({path}): füge sie in Slack, Teams, einen Chat oder eine E-Mail ein. Eine Datei, die offline in jedem Browser aufgeht. Sie enthält den Code aus dem Review, teil sie nur mit Leuten, die diesen Code sehen dürfen.',
   share_copy_failed: 'Die Seite ließ sich hier nicht in die Zwischenablage legen. Sie liegt hier: {path}; zieh sie in Slack, Teams, einen Chat oder eine E-Mail.',
   review_pr_no_git: 'Kein git-Repository.',
   review_pr_fetch_failed: 'PR #{number} konnte nicht geholt werden: {error}',

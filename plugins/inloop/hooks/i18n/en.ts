@@ -243,7 +243,7 @@ export const en = {
   share_mail_opened: 'A new message in your mail app has the page attached ({path}): add who it goes to and send it. The page holds the reviewed code, so send it only to people who may see that code. If your mail app is not set up, `/inloop share file` gives you the file to attach in web mail.',
   share_mail_web: 'Your e-mail opens in a browser, which cannot take a file from inloop. The page is at {path}: attach it to the e-mail.',
   share_mail_attach: 'The page is at {path}: attach it to an e-mail. It is one file that opens offline in any browser.',
-  share_copied: 'The page is on your clipboard: paste it into Slack, Teams, a chat or an e-mail. It is one file that opens offline in any browser. It holds the reviewed code, so share it only with people who may see that code.',
+  share_copied: 'The page is on your clipboard ({path}): paste it into Slack, Teams, a chat or an e-mail. It is one file that opens offline in any browser. It holds the reviewed code, so share it only with people who may see that code.',
   share_copy_failed: 'The page could not go on the clipboard here. It is at {path}: drag it into Slack, Teams, a chat or an e-mail.',
   review_pr_no_git: 'Not a git repository.',
   review_pr_fetch_failed: 'Could not fetch PR #{number}: {error}',

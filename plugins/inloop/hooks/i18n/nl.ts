@@ -240,7 +240,7 @@ export const nl: Labels = {
   share_mail_opened: 'In je mailprogramma staat een nieuw bericht met de pagina als bijlage ({path}): vul in naar wie het gaat en verstuur het. De pagina bevat de code uit de review, stuur haar alleen naar mensen die die code mogen zien. Is je mailprogramma niet ingesteld, dan geeft `/inloop share file` je het bestand voor je webmail.',
   share_mail_web: 'Je e-mail opent in een browser, en die kan geen bestand van inloop aannemen. De pagina staat hier: {path}; voeg haar toe aan de e-mail.',
   share_mail_attach: 'De pagina staat hier: {path}; voeg haar toe aan een e-mail. Eén bestand dat offline in elke browser opent.',
-  share_copied: 'De pagina staat op je klembord: plak haar in Slack, Teams, een chat of een e-mail. Eén bestand dat offline in elke browser opent. Het bevat de code uit de review, deel het alleen met mensen die die code mogen zien.',
+  share_copied: 'De pagina staat op je klembord ({path}): plak haar in Slack, Teams, een chat of een e-mail. Eén bestand dat offline in elke browser opent. Het bevat de code uit de review, deel het alleen met mensen die die code mogen zien.',
   share_copy_failed: 'De pagina kon hier niet op het klembord. Ze staat hier: {path}; sleep haar naar Slack, Teams, een chat of een e-mail.',
   review_pr_no_git: 'Geen git-repository.',
   review_pr_fetch_failed: 'PR #{number} kon niet worden opgehaald: {error}',

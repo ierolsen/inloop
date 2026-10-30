@@ -241,7 +241,7 @@ export const tr: Labels = {
   share_mail_opened: 'Mail uygulamanda sayfanın ekli olduğu yeni bir mesaj açıldı ({path}): kime gideceğini yaz ve gönder. Sayfada review\'daki kod var; yalnızca bu kodu görebilecek kişilere gönder. Mail uygulaman kurulu değilse `/inloop share file` dosyayı verir, web mail\'de eklersin.',
   share_mail_web: 'E-postan tarayıcıda açılıyor, tarayıcı inloop\'tan dosya alamıyor. Sayfa şurada: {path}; e-postaya ekle.',
   share_mail_attach: 'Sayfa şurada: {path}; bir e-postaya ekle. Tek dosya, her tarayıcıda offline açılır.',
-  share_copied: 'Sayfa clipboard\'da: Slack\'e, Teams\'e, bir sohbete ya da e-postaya yapıştır. Tek dosya, her tarayıcıda offline açılır. İçinde review\'daki kod var; yalnızca bu kodu görebilecek kişilerle paylaş.',
+  share_copied: 'Sayfa clipboard\'da ({path}): Slack\'e, Teams\'e, bir sohbete ya da e-postaya yapıştır. Tek dosya, her tarayıcıda offline açılır. İçinde review\'daki kod var; yalnızca bu kodu görebilecek kişilerle paylaş.',
   share_copy_failed: 'Sayfa burada clipboard\'a konamadı. Şurada: {path}; Slack\'e, Teams\'e, bir sohbete ya da e-postaya sürükle.',
   review_pr_no_git: 'Burası bir git reposu değil.',
   review_pr_fetch_failed: 'PR #{number} fetch edilemedi: {error}',

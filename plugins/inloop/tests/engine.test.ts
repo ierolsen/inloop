@@ -497,7 +497,7 @@ test('/inloop share asks where the review goes; on a Mac the mail app gets the p
   // a typed answer counts by its first word
   git['osascript -e on run argv -e set the clipboard to (POSIX file (item 1 of argv)) -e end run ' + PAGE] = ''
   w.answer = 'copy it please'
-  expect((await $.command.run(command('share'))).text).toStartWith('The page is on your clipboard: paste it into Slack, Teams, a chat or an e-mail.')
+  expect((await $.command.run(command('share'))).text).toStartWith('The page is on your clipboard (' + PAGE + '): paste it into Slack, Teams, a chat or an e-mail.')
   // web mail cannot take a file: the page is shown, to attach by hand
   git[PLIST] = JSON.stringify({ LSHandlers: [{ LSHandlerURLScheme: 'mailto', LSHandlerRoleAll: 'com.google.Chrome' }] })
   git['open -R ' + PAGE] = ''
