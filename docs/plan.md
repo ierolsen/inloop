@@ -1,5 +1,24 @@
 # inloop plan
 
+## Changes since this plan (30 Oct 2026)
+
+The first look at the review page (29 Oct) showed that it was organized around inloop's own units,
+sessions and tasks, with the code folded away. These changes followed:
+
+- **The review is commit by commit** (`/inloop review [range | all]`): each commit's reason, then
+  each file's code from git with the explanations numbered beside their lines. It replaces the
+  session pages and `/inloop open`.
+- **Notes say more about the code:** `tldr` (the point in one line), `uses` (what is brought in
+  from other files or libraries, from where and why), `lines` (comments anchored by a piece of the
+  line they explain) and `commit` (for explanations written afterwards).
+- **Commits are tracked** after every shell command and at the end of each turn.
+- **ADHD-friendly notes** (`/inloop adhd on`): a writing form, separate from the detail level.
+- **Theme and export:** an automatic, light or dark page, `--theme` for a fixed one, print to PDF.
+- **The pane is dropped:** the cards and Claude Code's own edit rows cover watching live, and the
+  review covers reading calmly.
+
+The sections below are the plan as it was approved on 29 Oct.
+
 ## Why
 
 Coding agents write code faster than people can follow. It is hard to say what a change does line
