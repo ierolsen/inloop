@@ -6,13 +6,14 @@ import { instructions, NOTE_SPEC, RECAP_SPEC } from './instructions.ts'
 import { cleanNote, cleanRecap, relative, inside, sameFile, Pairing } from './note.ts'
 import { diff, isBinary } from './diff.ts'
 import { redact, redactDeep, sensitive } from './redact.ts'
-import { SCHEMA, DIR, LOG_DIR, REVIEW_DIR, CONFIG, PART_BYTES, line, parse, partPath, bytes, sessionsOf, type LogRecord, type OutsideEntry, type Skipped } from './log.ts'
+import { SCHEMA, DIR, LOG_DIR, REVIEW_DIR, SHARE_DIR, CONFIG, PART_BYTES, line, parse, partPath, bytes, sessionsOf, type LogRecord, type OutsideEntry, type Skipped } from './log.ts'
 import { nul, porcelain, unaccounted, state, hunks, counts, inloopOwn, OUTSIDE_MAX } from './outside.ts'
 import { labels, hasLabels, say, count, nameOf, shownIn } from './i18n/index.ts'
 import type { Labels } from './i18n/en.ts'
 import { build as buildReview, type GitCommit, type FileData, type Review } from './review/review.ts'
 import { fit as fitReview, type Mode } from './review/page.ts'
 import { explore, parseBlame, covers, fileId, dirId, UNCOMMITTED, type FileState, type BlameInfo } from './review/explorer.ts'
+import { markdown, MARKER, COMMENT_MAX } from './review/markdown.ts'
 import { parsePatch, added, clip, lineCount } from './review/patch.ts'
 import type { Theme } from './review/html.ts'
 import { noteCard, recapCard } from './live/card.ts'
@@ -28,6 +29,7 @@ const UNTRACKED_MAX = 30 // files not in git yet that a review reads
 const COMMITS_MAX = 50 // commits recorded from one move of HEAD
 const EXPLORE_FILES = 40 // files a page shows the code of, with who wrote each line
 const EXPLORE_LINES = 2000 // a longer file is shown by its changes only
+const SHARE_MD_MAX = 1_000_000 // characters of the Markdown beside a shared page
 const NOTHING_OUTSIDE = '[[],0]' // fingerprint() of an empty list: where every baseline starts
 
 type Snapshot = { text: string; exists: boolean; skipped: Skipped | null }
@@ -514,20 +516,38 @@ async function explainedFiles($: any, all: LogRecord[]): Promise<{ path: string;
   return out
 }
 
+// Whether this computer is a Mac, where `open` shows pages and folders
+async function onMac($: any): Promise<boolean> {
+  try {
+    return (await $.process.run(['uname', '-s'], { cwd: root, timeoutMs: 5000 })).stdout.trim() === 'Darwin'
+  } catch {
+    return false // no uname: not a Mac
+  }
+}
+
 // Opens a page in the browser, where a person can see one. False when it could not.
 async function show($: any, path: string): Promise<boolean> {
   if (!interactive) return false
   let argv = ['xdg-open', path]
   if (/^[A-Za-z]:\//.test(path)) argv = ['cmd', '/c', 'start', '', path.replace(/\//g, '\\')]
-  else {
-    try {
-      if ((await $.process.run(['uname', '-s'], { cwd: root, timeoutMs: 5000 })).stdout.trim() === 'Darwin') argv = ['open', path]
-    } catch {
-      // no uname: try xdg-open
-    }
-  }
+  else if (await onMac($)) argv = ['open', path]
   try {
     return (await $.process.run(argv, { cwd: root, timeoutMs: 15000 })).exitCode === 0
+  } catch {
+    return false
+  }
+}
+
+// Shows a file in the file manager (Finder on a Mac), ready to attach to an email. False when it
+// could not.
+async function reveal($: any, path: string): Promise<boolean> {
+  if (!interactive) return false
+  let argv = ['xdg-open', path.slice(0, path.lastIndexOf('/')) || root]
+  if (/^[A-Za-z]:\//.test(path)) argv = ['explorer', '/select,' + path.replace(/\//g, '\\')]
+  else if (await onMac($)) argv = ['open', '-R', path]
+  try {
+    const r = await $.process.run(argv, { cwd: root, timeoutMs: 15000 })
+    return r.exitCode === 0 || argv[0] === 'explorer' // explorer answers 1 even when it opened
   } catch {
     return false
   }
@@ -599,12 +619,8 @@ async function fileStates($: any, model: Review, end: string | null, extra: stri
   return { states, info }
 }
 
-type Page = { what: string; theme: Theme; mode: Mode; extra: string[]; start: string | null; name: string }
-
-// Writes an explorer page and opens it. A review covers this session's work by default, every
-// commit inloop recorded with "all", or a git range or commit; an explanation covers every commit
-// inloop recorded and the files as they stand.
-async function writePage($: any, page: Page, l: Labels): Promise<string> {
+// The log as it stands, after a last look at HEAD and at files changed outside the edit tools
+async function fresh($: any): Promise<LogRecord[]> {
   await writing
   try {
     await checkHead($)
@@ -612,50 +628,74 @@ async function writePage($: any, page: Page, l: Labels): Promise<string> {
   } catch {
     // the page shows what git shows
   }
-  const all = await readAll($)
-  const what = page.what
-  const scope: 'session' | 'range' | 'all' = what === 'all' ? 'all' : what ? 'range' : 'session'
+  return readAll($)
+}
+
+// What a page covers: the commits, what is not committed, and the commit the files stand at (null
+// for the working folder)
+type Scope = { scope: 'session' | 'range' | 'all'; range: string | null; found: { commits: GitCommit[]; more: number }; pending: FileData[] | null; end: string | null }
+
+// This session's work by default, every commit inloop recorded with "all", or a git range or
+// commit. A message instead when git does not know the range.
+async function scopeOf($: any, what: string, all: LogRecord[], l: Labels): Promise<Scope | string> {
+  const scope: Scope['scope'] = what === 'all' ? 'all' : what ? 'range' : 'session'
   if (scope === 'range' && (!/^[\w./~^@{}:+-]+$/.test(what) || what.startsWith('-'))) return say(l.review_bad_range, { range: what })
-  let found: { commits: GitCommit[]; more: number } = { commits: [], more: 0 }
-  let pending: FileData[] | null = null
-  let end: string | null = null
-  if (git) {
-    if (scope === 'all') found = await recordedCommits($, all)
-    else {
-      // this session's commits start where HEAD stood when it began; in a repository that had none
-      // yet, every commit is the session's
-      const got = scope === 'range' ? await commitsOf($, what) : await commitsOf($, firstHead ? firstHead + '..HEAD' : 'HEAD', false)
-      if (!got && scope === 'range') return say(l.review_bad_range, { range: what })
-      if (got) found = got
-    }
-    if (scope !== 'range') pending = await pendingFiles($)
-    else end = await endOf($, what)
+  const out: Scope = { scope, range: scope === 'range' ? what : null, found: { commits: [], more: 0 }, pending: null, end: null }
+  if (!git) return out
+  if (scope === 'all') out.found = await recordedCommits($, all)
+  else {
+    // this session's commits start where HEAD stood when it began; in a repository that had none
+    // yet, every commit is the session's
+    const got = scope === 'range' ? await commitsOf($, what) : await commitsOf($, firstHead ? firstHead + '..HEAD' : 'HEAD', false)
+    if (!got && scope === 'range') return say(l.review_bad_range, { range: what })
+    if (got) out.found = got
   }
+  if (scope !== 'range') out.pending = await pendingFiles($)
+  else out.end = await endOf($, what)
+  return out
+}
+
+const project = () => root.split('/').pop() || root
+
+function modelOf(s: Scope, all: LogRecord[], explained: { path: string; text: string }[]): Review {
+  return buildReview({ records: all, commits: s.found.commits, more: s.found.more, pending: s.pending, explained, git, scope: s.scope, range: s.range, project: project() })
+}
+
+type Page = { theme: Theme; mode: Mode; extra: string[]; start: string | null }
+
+// The explorer page of a model, within the size a mod may write
+async function pageOf($: any, model: Review, end: string | null, page: Page): Promise<{ html: string; cut: number }> {
   const code = shownIn(settings.language.code)
-  const model = buildReview({
-    records: all, commits: found.commits, more: found.more, pending, explained: await explainedFiles($, all), git, scope,
-    range: scope === 'range' ? what : null, project: root.split('/').pop() || root,
-  })
   const { states, info } = await fileStates($, model, end, page.extra)
   const explorer = explore(model, states, info)
-  const { html, cut } = fitReview(model, explorer, labels(code), { code, theme: page.theme, version: VERSION, level: model.written ?? settings.level.value, written: !!model.written, mode: page.mode, start: page.start })
-  const path = root + '/' + REVIEW_DIR + '/' + page.name + (page.theme === 'auto' ? '' : '-' + page.theme) + '.html'
+  return fitReview(model, explorer, labels(code), { code, theme: page.theme, version: VERSION, level: model.written ?? settings.level.value, written: !!model.written, mode: page.mode, start: page.start })
+}
+
+// Writes a page under .inloop/review and opens it
+async function writeAndShow($: any, name: string, theme: Theme, html: string, cut: number, explaining: boolean, l: Labels): Promise<string> {
+  const path = root + '/' + REVIEW_DIR + '/' + name + (theme === 'auto' ? '' : '-' + theme) + '.html'
   await keepOutOfGit($)
   await $.fs.write(path, html)
   const opened = await show($, path)
-  const said = page.mode === 'explain' ? (opened ? l.explain_opened : l.explain_written) : opened ? l.review_opened : l.review_written
+  const said = explaining ? (opened ? l.explain_opened : l.explain_written) : opened ? l.review_opened : l.review_written
   return say(said, { path }) + (cut ? '\n' + l.review_trimmed : '')
 }
 
+const nameOfRange = (what: string) => (!what ? 'review' : what === 'all' ? 'review-all' : 'review-' + what.replace(/[^\w.-]+/g, '_').slice(0, 60))
+
 async function review($: any, what: string, theme: Theme, l: Labels): Promise<string> {
-  const name = !what ? 'review' : what === 'all' ? 'review-all' : 'review-' + what.replace(/[^\w.-]+/g, '_').slice(0, 60)
-  return writePage($, { what, theme, mode: 'review', extra: [], start: null, name }, l)
+  const all = await fresh($)
+  const s = await scopeOf($, what, all, l)
+  if (typeof s === 'string') return s
+  const model = modelOf(s, all, await explainedFiles($, all))
+  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'review', extra: [], start: null })
+  return writeAndShow($, nameOfRange(what), theme, html, cut, false, l)
 }
 
 // The code as it stands with every explanation inloop has, opened on one file or folder when one
 // is named
 async function explain($: any, target: string, theme: Theme, l: Labels): Promise<string> {
-  let rel = target ? relative(target, root).replace(/^\.\//, '').replace(/\/+$/, '') : ''
+  const rel = target ? relative(target, root).replace(/^\.\//, '').replace(/\/+$/, '') : ''
   const extra: string[] = []
   let opening: string | null = null
   if (rel) {
@@ -674,8 +714,184 @@ async function explain($: any, target: string, theme: Theme, l: Labels): Promise
       opening = dirId(rel)
     } else return say(l.explain_missing, { path: target })
   }
-  const name = 'explain' + (rel ? '-' + rel.replace(/[^\w.-]+/g, '_').slice(0, 60) : '')
-  return writePage($, { what: 'all', theme, mode: 'explain', extra, start: opening ?? 'd-root', name }, l)
+  const all = await fresh($)
+  const s = await scopeOf($, 'all', all, l)
+  if (typeof s === 'string') return s
+  const model = modelOf(s, all, await explainedFiles($, all))
+  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'explain', extra, start: opening ?? 'd-root' })
+  return writeAndShow($, 'explain' + (rel ? '-' + rel.replace(/[^\w.-]+/g, '_').slice(0, 60) : ''), theme, html, cut, true, l)
+}
+
+// ---- sharing ----------------------------------------------------------------------------------
+
+// gh and git never stop to ask for a password or a choice: the command fails instead, and says so
+const NO_PROMPT = { GIT_TERMINAL_PROMPT: '0', GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1' }
+const firstLine = (text: string) => (text.trim().split('\n').find((x) => x.trim()) ?? '').trim().slice(0, 300)
+
+async function ghRun($: any, argv: string[], timeoutMs = 60000): Promise<{ ok: boolean; out: string; err: string }> {
+  try {
+    const r = await $.process.run(['gh', ...argv], { cwd: root, timeoutMs, env: NO_PROMPT })
+    return { ok: r.exitCode === 0, out: r.stdout, err: r.stderr ?? '' }
+  } catch (err) {
+    return { ok: false, out: '', err: String(err) }
+  }
+}
+
+type Pr = { number: number; title: string; url: string; head: string; host: string; owner: string; repo: string; commits: string[] }
+
+// The pull request named (a number), or the one for the current branch, as gh sees it. Read only.
+async function prOf($: any, which: string, l: Labels): Promise<Pr | string> {
+  if (!(await ghRun($, ['--version'], 15000)).ok) return l.share_needs_gh
+  const r = await ghRun($, ['pr', 'view', ...(which ? [which] : []), '--json', 'number,title,url,headRefOid,commits'])
+  if (!r.ok) {
+    if (/no (open )?pull requests? found|could not find pull request|could not resolve to a pullrequest/i.test(r.err)) return which ? say(l.share_no_pr_named, { number: which }) : l.share_no_pr
+    if (/gh auth login|not logged in|authentication/i.test(r.err)) return l.share_needs_gh
+    return say(l.share_gh_failed, { error: firstLine(r.err) })
+  }
+  try {
+    const v = JSON.parse(r.out)
+    const at = /^https?:\/\/([^/]+)\/([^/]+)\/([^/]+)\/pull\/(\d+)/.exec(String(v.url))
+    if (!at || !/^[0-9a-f]{40}$/.test(String(v.headRefOid))) return say(l.share_gh_failed, { error: 'unexpected answer from gh pr view' })
+    const commits = (Array.isArray(v.commits) ? v.commits : []).map((c: any) => String(c?.oid ?? '')).filter((x: string) => /^[0-9a-f]{40}$/.test(x))
+    return { number: Number(v.number), title: String(v.title ?? ''), url: String(v.url), head: String(v.headRefOid), host: at[1], owner: at[2], repo: at[3], commits }
+  } catch {
+    return say(l.share_gh_failed, { error: 'unexpected answer from gh pr view' })
+  }
+}
+
+// gh api for the pull request's own repository, named in full: a fork with an upstream remote could
+// otherwise point gh at another one
+const api = (pr: Pr, path: string) => [...(pr.host === 'github.com' ? [] : ['--hostname', pr.host]), 'repos/' + pr.owner + '/' + pr.repo + path]
+
+// inloop's earlier comment on the pull request: the one the person wrote that starts with the
+// marker. Null when there is none, or when gh cannot say who the person is.
+async function ownComment($: any, pr: Pr): Promise<string | null> {
+  const who = await ghRun($, ['api', ...(pr.host === 'github.com' ? [] : ['--hostname', pr.host]), 'user', '--jq', '.login'])
+  const login = who.out.trim()
+  if (!who.ok || !/^[A-Za-z0-9-]+$/.test(login)) return null
+  const filter = '.[] | select(.user.login == "' + login + '" and (.body | startswith("' + MARKER + '"))) | .id'
+  const r = await ghRun($, ['api', '--paginate', ...api(pr, '/issues/' + pr.number + '/comments'), '--jq', filter])
+  return r.ok ? r.out.split('\n').map((x) => x.trim()).filter((x) => /^\d+$/.test(x)).pop() ?? null : null
+}
+
+// The commits of a list, in order, the newest REVIEW_COMMITS of them, and how many of them git does
+// not have here
+async function commitsByOid($: any, oids: string[]): Promise<{ commits: GitCommit[]; more: number; missing: number }> {
+  const want = oids.slice(-REVIEW_COMMITS)
+  if (!want.length) return { commits: [], more: 0, missing: 0 }
+  const r = await gitRun($, ['git', 'log', '--no-walk=sorted', '--ignore-missing', LOG_FORMAT, ...want])
+  const commits = (await commitsFrom($, r.ok ? r.out : '')).reverse()
+  return { commits, more: oids.length - want.length, missing: want.length - commits.length }
+}
+
+const shareFile = (name: string) => root + '/' + SHARE_DIR + '/' + name
+
+// /inloop share [range | all]: the page with a fixed theme and its Markdown, in .inloop/share,
+// shown in the file manager to attach to an email
+async function share($: any, what: string, theme: Theme, l: Labels): Promise<string> {
+  const all = await fresh($)
+  const s = await scopeOf($, what, all, l)
+  if (typeof s === 'string') return s
+  const model = modelOf(s, all, await explainedFiles($, all))
+  const code = shownIn(settings.language.code)
+  const text = markdown(model, labels(code), { code, level: model.written ?? settings.level.value, version: VERSION, marker: false, max: SHARE_MD_MAX }).text
+  const { html, cut } = await pageOf($, model, s.end, { theme: theme === 'auto' ? 'light' : theme, mode: 'review', extra: [], start: null })
+  const name = 'inloop-' + project().replace(/[^\w.-]+/g, '_').slice(0, 40) + (what ? '-' + nameOfRange(what).replace(/^review-?/, '') : '')
+  const page = shareFile(name + '.html')
+  const md = shareFile(name + '.md')
+  await keepOutOfGit($)
+  await $.fs.write(page, html)
+  await $.fs.write(md, text)
+  const shown = await reveal($, page)
+  return say(l.share_file, { path: page, md }) + (shown ? '\n' + l.share_file_shown : '') + (cut ? '\n' + l.review_trimmed : '')
+}
+
+// Writes the comment for a pull request where the person can read it first, with what it was made
+// from, and says what --yes will do
+async function preview($: any, pr: Pr, l: Labels): Promise<string> {
+  const all = await fresh($)
+  const got = await commitsByOid($, pr.commits)
+  const s: Scope = { scope: 'range', range: say(l.x_pr_range, { number: pr.number }), found: got, pending: null, end: pr.head }
+  const model = modelOf(s, all, [])
+  const code = shownIn(settings.language.code)
+  const { text, cut } = markdown(model, labels(code), { code, level: model.written ?? settings.level.value, version: VERSION, marker: true, max: COMMENT_MAX })
+  const comment = await ownComment($, pr)
+  const md = shareFile('pr-' + pr.number + '.md')
+  await keepOutOfGit($)
+  await $.fs.write(md, text)
+  await $.fs.write(shareFile('pr-' + pr.number + '.json'), JSON.stringify({ number: pr.number, head: pr.head, url: pr.url, chars: text.length }) + '\n')
+  const said = [say(l.share_pr_preview, {
+    number: pr.number, title: pr.title, url: pr.url, path: md, chars: text.length, commits: count(code, l.r_commits, got.commits.length),
+    action: comment ? l.share_pr_action_update : l.share_pr_action_new,
+  })]
+  if (got.missing) said.push(count(code, l.share_pr_missing, got.missing))
+  if (cut) said.push(l.share_pr_cut)
+  return said.join('\n')
+}
+
+// Origins of a command a person typed: the prompt, the remote bridge to it, or `claude -p`
+const TYPED = new Set(['composer', 'bridge', 'sdk'])
+
+// /inloop share pr [n] [--yes]: a preview by default; with --yes, the previewed comment is posted,
+// or inloop's earlier comment there replaced, when the pull request has not moved since
+async function sharePr($: any, which: string, yes: boolean, origin: string, l: Labels): Promise<string> {
+  if (which && !/^\d{1,9}$/.test(which)) return l.share_bad
+  if (yes && !TYPED.has(origin)) return l.share_not_typed
+  const pr = await prOf($, which, l)
+  if (typeof pr === 'string') return pr
+  if (!yes) return preview($, pr, l)
+  const md = shareFile('pr-' + pr.number + '.md')
+  let saved: any = null
+  try {
+    saved = JSON.parse(await $.fs.read(shareFile('pr-' + pr.number + '.json')))
+  } catch {
+    saved = null
+  }
+  let text = ''
+  try {
+    text = saved && saved.number === pr.number && saved.head === pr.head ? await $.fs.read(md) : ''
+  } catch {
+    text = ''
+  }
+  if (!text.trim()) return say(l.share_pr_stale, { number: pr.number }) + '\n' + (await preview($, pr, l))
+  if (text.length > COMMENT_MAX + 5000) return say(l.share_pr_too_long, { path: md })
+  const body = shareFile('pr-' + pr.number + '.body.json')
+  await $.fs.write(body, JSON.stringify({ body: text }))
+  const comment = await ownComment($, pr)
+  const r = comment
+    ? await ghRun($, ['api', '-X', 'PATCH', ...api(pr, '/issues/comments/' + comment), '--input', body, '--jq', '.html_url'])
+    : await ghRun($, ['api', '-X', 'POST', ...api(pr, '/issues/' + pr.number + '/comments'), '--input', body, '--jq', '.html_url'])
+  if (!r.ok) return say(l.share_gh_failed, { error: firstLine(r.err) })
+  return say(comment ? l.share_pr_updated : l.share_pr_posted, { number: pr.number, url: r.out.trim() || pr.url })
+}
+
+// /inloop review pr [n]: the pull request fetched into refs/inloop/pr-<n>, reviewed as it stands on
+// GitHub
+async function reviewPr($: any, which: string, theme: Theme, l: Labels): Promise<string> {
+  if (which && !/^\d{1,9}$/.test(which)) return l.share_bad
+  if (!git) return l.review_pr_no_git
+  const pr = await prOf($, which, l)
+  if (typeof pr === 'string') return pr
+  // fetch from the remote that is the pull request's repository, else from its address
+  const remotes = (await gitRun($, ['git', 'remote', '-v'])).out.split('\n')
+  const slug = (pr.owner + '/' + pr.repo).toLowerCase()
+  const named = remotes.map((x) => x.split(/\s+/)).find(([, url = '']) => url.toLowerCase().replace(/\.git$/, '').endsWith(slug) && url.toLowerCase().includes(pr.host.toLowerCase()))
+  const from = named?.[0] ?? 'https://' + pr.host + '/' + pr.owner + '/' + pr.repo + '.git'
+  const ref = 'refs/inloop/pr-' + pr.number
+  let fetched: { ok: boolean; err: string }
+  try {
+    const r = await $.process.run(['git', 'fetch', '--no-tags', '--quiet', from, '+refs/pull/' + pr.number + '/head:' + ref], { cwd: root, timeoutMs: 120000, env: NO_PROMPT })
+    fetched = { ok: r.exitCode === 0, err: r.stderr ?? '' }
+  } catch (err) {
+    fetched = { ok: false, err: String(err) }
+  }
+  if (!fetched.ok) return say(l.review_pr_fetch_failed, { number: pr.number, error: firstLine(fetched.err) })
+  const all = await fresh($)
+  const got = await commitsByOid($, pr.commits)
+  const s: Scope = { scope: 'range', range: say(l.x_pr_range, { number: pr.number }) + (pr.title ? ': ' + pr.title : ''), found: got, pending: null, end: ref }
+  const model = modelOf(s, all, [])
+  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'review', extra: [], start: null })
+  return writeAndShow($, 'review-pr-' + pr.number, theme, html, cut, false, l)
 }
 
 function statusText(): string {
@@ -705,7 +921,7 @@ export function register(on: any, pluginOptions: any) {
       await $.command.register({
         name: PLUGIN,
         description: 'inloop: review Claude\'s work, explain the code as it stands, the language and level of notes, on and off',
-        argumentHint: '[review [range | all] | explain [path] | status | lang <language> | level <level> | adhd on|off | on | off | help] [--theme light|dark]',
+        argumentHint: '[review [range | all | pr [n]] | explain [path] | share [range | pr [n] [--yes]] | status | lang <language> | level <level> | adhd on|off | on | off | help]',
         immediate: true,
       })
     } catch (err) {
@@ -845,13 +1061,21 @@ export function register(on: any, pluginOptions: any) {
     const [command = 'status', ...rest] = words.filter((w) => w !== '--project')
     const value = rest.join(' ')
     if (command === 'help') return { text: l.help }
-    if (command === 'review' || command === 'explain') {
+    if (command === 'review' || command === 'explain' || command === 'share') {
       const at = rest.indexOf('--theme')
       const wanted = at >= 0 ? rest[at + 1] : ''
       const theme: Theme = wanted === 'light' || wanted === 'dark' ? wanted : 'auto'
       const args = rest.filter((_, i) => at < 0 || (i !== at && i !== at + 1))
       try {
-        return { text: command === 'review' ? await review($, args[0] ?? '', theme, l) : await explain($, args.join(' '), theme, l) }
+        if (command === 'explain') return { text: await explain($, args.join(' '), theme, l) }
+        if (command === 'review') return { text: args[0] === 'pr' ? await reviewPr($, args[1] ?? '', theme, l) : await review($, args[0] ?? '', theme, l) }
+        const [how = 'file', ...more] = args
+        const yes = more.includes('--yes')
+        const plain = more.filter((w) => w !== '--yes')
+        if (how === 'pr') return { text: plain.length > 1 ? l.share_bad : await sharePr($, plain[0] ?? '', yes, String(e.origin?.kind ?? ''), l) }
+        if (how === 'link') return { text: l.share_link_later }
+        if (yes) return { text: l.share_bad }
+        return { text: await share($, how === 'file' ? plain[0] ?? '' : how, theme, l) }
       } catch (err) {
         return { text: say(l.review_failed, { error: String(err) }) }
       }

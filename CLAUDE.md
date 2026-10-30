@@ -48,7 +48,9 @@ Claude Code analyzes the module statically, so:
 - Capture must never block or lose an edit: every path of an edit hook ends in `next(e)`, and
   errors are logged and skipped.
 - No network or model calls (`$.http`, `$.model`). inloop keeps everything in the project's
-  `.inloop/` folder; see `docs/privacy.md`.
+  `.inloop/` folder; see `docs/privacy.md`. The only exceptions are the pull request commands,
+  which run the person's own `gh` and `git fetch` when they type them: reads only, and a post only
+  with `--yes` after a preview.
 
 ## Language
 

@@ -405,3 +405,108 @@ test('/inloop explain shows the code of the file asked for, even in a project wi
   expect(html).toContain('<code>/inloop explain m40.py</code>')
   expect(html).not.toContain('<code>/inloop explain m38.py</code>')
 })
+
+// A session that wrote shapes.py and committed it as B on top of A, for the sharing tests
+async function committedShapes($: any, on: any) {
+  const A = 'a1'.repeat(20)
+  const B = 'b2'.repeat(20)
+  const SHAPES = 'class Rectangle:\n    def area(self):\n        return self.w * self.h\n'
+  const git: Git = { 'git rev-parse --show-toplevel': ROOT + '\n', 'git rev-parse --verify --quiet HEAD': A + '\n', 'git status --porcelain=v1 -z --untracked-files=all': '' }
+  const w = worldOf(on, { git })
+  await $.session.start(START)
+  await $.turn.start({ text: 'build', turnId: 't1' })
+  await $.tool.call({ ...note({ title: 'Shapes', files: ['shapes.py'], symbols: [{ name: 'Rectangle', kind: 'class', why_exists: 'holds sizes' }], lines: [{ anchor: 'return self.w * self.h', says: 'area is width times height, ask @erol' }] }), tool_use_id: 'n1' })
+  await $.tool.call({ tool: 'Write', tool_use_id: 'w1', file_path: ROOT + '/shapes.py', content: SHAPES } as any)
+  w.shell = () => Object.assign(git, {
+    'git rev-parse --verify --quiet HEAD': B + '\n',
+    ['git rev-list --reverse --max-count=50 ' + A + '..' + B]: B + '\n',
+    ['git show -s --format=%P%x00%s ' + B]: A + '\u0000feat: add shapes\n',
+    ['git diff-tree --no-commit-id --name-only -r -z --root ' + B]: 'shapes.py\u0000',
+  })
+  await $.tool.call({ tool: 'Bash', command: 'git commit -am shapes' } as any)
+  const FORMAT = '--format=%H%x00%P%x00%an%x00%at%x00%s%x00%b%x1e'
+  const LOGGED = B + '\u0000' + A + '\u0000Erol\u00001700000000\u0000feat: add shapes\u0000\u001e\n'
+  Object.assign(git, {
+    ['git log --no-walk=sorted --ignore-missing ' + FORMAT + ' ' + B]: LOGGED,
+    ['git rev-list --count ' + A + '..HEAD --']: '1\n',
+    ['git log --reverse --max-count=30 ' + FORMAT + ' ' + A + '..HEAD --']: LOGGED,
+    ['git -c core.quotePath=false show --format= --no-color --no-ext-diff ' + B + ' -W']: 'diff --git a/shapes.py b/shapes.py\nnew file mode 100644\n--- /dev/null\n+++ b/shapes.py\n@@ -0,0 +1,3 @@\n' + SHAPES.trimEnd().split('\n').map((l) => '+' + l).join('\n') + '\n',
+    'git -c core.quotePath=false diff --no-color --no-ext-diff HEAD -W': '',
+    'git ls-files --others --exclude-standard -z': '',
+  })
+  return { w, git, A, B, SHAPES }
+}
+const PR_VIEW = 'gh pr view --json number,title,url,headRefOid,commits'
+const prJson = (head: string, commits: string[]) => JSON.stringify({ number: 7, title: 'Add shapes', url: 'https://github.com/erol/shop/pull/7', headRefOid: head, commits: commits.map((oid) => ({ oid })) })
+const COMMENTS = 'gh api --paginate repos/erol/shop/issues/7/comments --jq .[] | select(.user.login == "erol" and (.body | startswith("<!-- inloop -->"))) | .id'
+
+test('/inloop share writes a light page and its Markdown to attach to an email, and sends nothing', async ($, on) => {
+  const { w } = await committedShapes($, on)
+  const text = (await $.command.run(command('share'))).text
+  expect(text).toStartWith('The page to share is at ' + ROOT + '/.inloop/share/inloop-work.html, and the same as Markdown at ' + ROOT + '/.inloop/share/inloop-work.md.')
+  expect(text).toContain('send it only to people who may see this code')
+  expect(w.files.get(ROOT + '/.inloop/share/inloop-work.html')).toContain('data-theme="light" data-fixed')
+  const md = w.files.get(ROOT + '/.inloop/share/inloop-work.md') ?? ''
+  expect(md).toStartWith('## Review: what Claude changed, and why')
+  expect(md).toContain('area is width times height, ask @⁠erol')
+  expect(w.ran).toContain('xdg-open ' + ROOT + '/.inloop/share')
+  expect(w.ran.filter((c) => c.startsWith('gh '))).toEqual([])
+  expect((await $.command.run(command('share link'))).text).toStartWith('Sharing by link (a secret gist) comes in a later version.')
+})
+
+test('/inloop share pr shows a preview first, posts only with --yes typed by a person, and updates its own comment in place', async ($, on) => {
+  const { w, git, B } = await committedShapes($, on)
+  const posted = () => w.ran.filter((c) => c.startsWith('gh api -X'))
+  // no gh: said plainly
+  expect((await $.command.run(command('share pr'))).text).toBe('This needs the GitHub CLI, gh, signed in with `gh auth login`: https://cli.github.com')
+  Object.assign(git, { 'gh --version': 'gh version 2.82.0\n', [PR_VIEW]: prJson(B, [B]), [PR_VIEW.replace('view', 'view 7')]: prJson(B, [B]), 'gh api user --jq .login': 'erol\n', [COMMENTS]: '' })
+  const preview = (await $.command.run(command('share pr'))).text
+  expect(preview).toBe('Nothing is sent yet. This is the comment for pull request #7 (Add shapes), https://github.com/erol/shop/pull/7:\n' + ROOT + '/.inloop/share/pr-7.md\n' +
+    (w.files.get(ROOT + '/.inloop/share/pr-7.md') ?? '').length + ' characters, from 1 commit. `/inloop share pr 7 --yes` adds it as a comment.')
+  const comment = w.files.get(ROOT + '/.inloop/share/pr-7.md') ?? ''
+  expect(comment).toStartWith('<!-- inloop -->\n')
+  expect(comment).toContain('area is width times height')
+  expect(posted()).toEqual([])
+  // only a person may send: a command from another plugin is refused before gh is asked anything
+  const asked = w.ran.length
+  expect((await $.command.run({ ...command('share pr --yes'), origin: { kind: 'plugin', name: 'other' } })).text).toBe('inloop sends something only when you type the command yourself, so nothing was sent.')
+  expect(w.ran.length).toBe(asked)
+  // --yes posts the previewed text as a new comment
+  const POST = 'gh api -X POST repos/erol/shop/issues/7/comments --input ' + ROOT + '/.inloop/share/pr-7.body.json --jq .html_url'
+  git[POST] = 'https://github.com/erol/shop/pull/7#issuecomment-1\n'
+  expect((await $.command.run(command('share pr --yes'))).text).toBe('inloop\'s comment is on pull request #7: https://github.com/erol/shop/pull/7#issuecomment-1')
+  expect(JSON.parse(w.files.get(ROOT + '/.inloop/share/pr-7.body.json') ?? '{}').body).toBe(comment)
+  expect(posted()).toEqual([POST])
+  // the next time, inloop's own comment is found (by its marker and the person's login) and replaced
+  git[COMMENTS] = '555\n'
+  expect((await $.command.run(command('share pr 7'))).text).toContain('`/inloop share pr 7 --yes` replaces inloop\'s earlier comment there with it.')
+  const PATCH = 'gh api -X PATCH repos/erol/shop/issues/comments/555 --input ' + ROOT + '/.inloop/share/pr-7.body.json --jq .html_url'
+  git[PATCH] = 'https://github.com/erol/shop/pull/7#issuecomment-555\n'
+  expect((await $.command.run(command('share pr 7 --yes'))).text).toBe('inloop\'s comment on pull request #7 is updated: https://github.com/erol/shop/pull/7#issuecomment-555')
+  expect(posted()).toEqual([POST, PATCH])
+  // a pull request that moved since its preview gets a new preview, not a post
+  git[PR_VIEW] = prJson('c3'.repeat(20), [B])
+  expect((await $.command.run(command('share pr --yes'))).text).toStartWith('Nothing was sent: there is no preview for pull request #7, or the pull request changed since. Here is a new one.\nNothing is sent yet.')
+  expect(posted()).toEqual([POST, PATCH])
+  expect((await $.command.run(command('share pr seven'))).text).toStartWith('Use `/inloop share`')
+})
+
+test('/inloop review pr fetches the pull request into its own ref and reviews it as it stands there', async ($, on) => {
+  const { w, git, B, SHAPES } = await committedShapes($, on)
+  const REF = 'refs/inloop/pr-7'
+  Object.assign(git, {
+    'gh --version': 'gh version 2.82.0\n', [PR_VIEW + '']: prJson(B, [B]), ['gh pr view 7 --json number,title,url,headRefOid,commits']: prJson(B, [B]),
+    'git remote -v': 'origin\tgit@github.com:erol/shop.git (fetch)\norigin\tgit@github.com:erol/shop.git (push)\n',
+    ['git fetch --no-tags --quiet origin +refs/pull/7/head:' + REF]: '',
+    ['git cat-file -s ' + REF + ':shapes.py']: SHAPES.length + '\n',
+    ['git show ' + REF + ':shapes.py']: SHAPES,
+  })
+  const page = ROOT + '/.inloop/review/review-pr-7.html'
+  expect((await $.command.run(command('review pr 7'))).text).toBe('The review is at ' + page)
+  expect(w.ran).toContain('git fetch --no-tags --quiet origin +refs/pull/7/head:' + REF)
+  const html = w.files.get(page) ?? ''
+  expect(html).toContain('Commits in pull request #7: Add shapes')
+  expect(html).toContain('area is width times height')
+  expect(html).toContain('<section class="view" id="' + fileId('shapes.py') + '"')
+  expect((await $.command.run(command('review pr x'))).text).toStartWith('Use `/inloop share`')
+})

@@ -8,6 +8,7 @@ export const SCHEMA = 1
 export const DIR = '.inloop'
 export const LOG_DIR = DIR + '/log'
 export const REVIEW_DIR = DIR + '/review'
+export const SHARE_DIR = DIR + '/share'
 export const CONFIG = DIR + '/config.json'
 // $.fs.write replaces a file and takes at most 4 MiB, so a session's log moves to a new part first
 export const PART_BYTES = 3_500_000

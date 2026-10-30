@@ -27,6 +27,13 @@ want, and in an ADHD-friendly form if you want.
   the last ten commits, `/inloop review a1b2c3d` for one.
 - **The code as it stands.** `/inloop explain src/app.py` opens the same page on one file or
   folder, with every explanation inloop has for it.
+- **Pull requests.** `/inloop review pr 12` fetches a pull request and opens it the same way.
+  `/inloop share pr` writes a comment for your pull request, commit by commit, and shows it to you
+  first; `/inloop share pr --yes` posts it, or updates inloop's earlier comment instead of adding
+  another.
+- **Share it.** `/inloop share` writes the page and a Markdown version to `.inloop/share/` and
+  shows them in your file manager, ready to attach to an email. The page opens in any browser,
+  offline, and prints to PDF.
 - **Code you did not watch being written.** `/inloop:annotate` asks Claude to explain existing
   code, a folder, or a range of commits after the fact, in the same format, marked as explained
   afterwards.
@@ -67,7 +74,10 @@ To try it in one session without installing, clone this repository and run
 |---|---|
 | `/inloop review` | The review of this session: its commits, then what is not committed yet |
 | `/inloop review <range>` | Any commits: `main..`, `HEAD~5..`, `a1b2c3d`; `all` for every commit inloop recorded |
+| `/inloop review pr [n]` | A pull request, fetched from GitHub with `gh` (the current branch's without a number) |
 | `/inloop explain [path]` | The code as it stands, opened on a file or folder, with every explanation inloop has |
+| `/inloop share [range]` | The page and its Markdown in `.inloop/share/`, to attach to an email |
+| `/inloop share pr [n]` | A preview of a comment for the pull request; add `--yes` to post it |
 | `/inloop review ... --theme light` | The page with a fixed theme, to share or print (`dark` also works) |
 | `/inloop:annotate <target>` | Claude explains existing code: a file, a folder, a function, a commit range |
 | `/inloop lang <language>` | The language of the notes, for all your projects (`--project` for this one) |
@@ -95,11 +105,14 @@ that changes nothing writes nothing.
 
 ## Privacy
 
-inloop makes no network requests and no model calls of its own. The notes are written by Claude
-in your session, so they cost output tokens; `/inloop level essentials` or `/inloop off` keep
-that down. Secrets are redacted before anything is written, and files that usually hold secrets, such
+inloop's own code makes no network requests and no model calls. Two commands run your own tools
+for a pull request, only when you type them: `/inloop review pr` and `/inloop share pr` read it
+with `gh` and `git fetch`, and only `/inloop share pr --yes` posts anything, as you, with your own
+`gh` login. The notes are written by Claude in your session, so they cost output tokens;
+`/inloop level essentials` or `/inloop off` keep that down. Secrets are redacted before anything is written, and files that usually hold secrets, such
 as `.env` files and keys, are recorded by name only. The review page is a single file that loads
-nothing from the internet. See [docs/privacy.md](docs/privacy.md).
+nothing from the internet; it holds the code of the files it covers, so share it only with people
+who may see that code. See [docs/privacy.md](docs/privacy.md).
 
 ## Limits
 

@@ -14,6 +14,7 @@ import { place, segments } from '../hooks/review/anchor.ts'
 import { build } from '../hooks/review/review.ts'
 import { render, fit } from '../hooks/review/page.ts'
 import { explore, parseBlame, slug, fileId, dirId, folders } from '../hooks/review/explorer.ts'
+import { markdown, md, MARKER, COMMENT_MAX } from '../hooks/review/markdown.ts'
 import { roleOf, fixedOrder } from '../hooks/review/roles.ts'
 import { bytes } from '../hooks/log.ts'
 
@@ -286,4 +287,32 @@ test('a page over its budget leaves out what it shows twice first, then the long
   const small = fit(r, explore(r, states as any, INFO), labels('en'), { ...OPTIONS, code: 'en' }, Math.round(full / 3)).html
   expect(small).toContain('The code of this file is left out to keep the page small')
   expect(small).toContain('See this change in its commit')
+})
+
+test('the Markdown of a review: no HTML and no mentions from a note, levels as on the page, and within its limit', async () => {
+  expect(md('a <b> `x<y> @a` @erol & @team-x')).toBe('a &lt;b&gt; `x<y> @a` @⁠erol &amp; @⁠team-x')
+  const O = { code: 'en', level: 'full' as const, version: '0.1.0', marker: true, max: COMMENT_MAX }
+  const full = markdown(build(source()), labels('en'), O)
+  expect(full.text.startsWith(MARKER + '\n\n## Review: what Claude changed, and why\n\n<sub>4 commits \u00b7 7 files \u00b7 5 notes</sub>\n')).toBe(true)
+  expect(full.cut).toBe(false)
+  for (const word of ['### `b2b2b2b` Shapes', '> p', 'Line by line (2)', '- `shapes.py:1` `Rectangle` (class): holds sizes', '- `shapes.py:5` picks the **biggest**',
+    '- **random seed**: the start of a random sequence', '- [ ] Run `pytest`.', '&lt;script&gt;alert(1)&lt;/script&gt;', '**Impact**\n\n- app.py relies on largest()', '2 older commits in this range are not shown.']) {
+    expect(full.text, word).toContain(word)
+  }
+  // a higher level leaves out what the page would hide
+  const big = markdown(build(source()), labels('en'), { ...O, level: 'big-picture' }).text
+  for (const gone of ['Line by line', 'random seed', '**What**']) expect(big, gone).not.toContain(gone)
+  expect(big).toContain('app.py relies on largest()')
+  // over the limit: detail goes first, then the oldest commits, and the text says so
+  for (const max of [full.text.length - 100, Math.round(full.text.length / 2), 400]) {
+    const tight = markdown(build(source()), labels('en'), { ...O, max })
+    expect(tight.text.length, String(max)).toBeLessThanOrEqual(max)
+    expect(tight.cut, String(max)).toBe(true)
+    expect(tight.text, String(max)).toContain('Some detail is left out')
+  }
+  // the line-by-line part goes first
+  const less = markdown(build(source()), labels('en'), { ...O, max: full.text.length - 100 }).text
+  expect(less).not.toContain('Line by line')
+  expect(less).toContain('random seed')
+  expect(markdown(build(source()), labels('tr'), { ...O, code: 'tr' }).text).toContain('Satır satır (2)')
 })

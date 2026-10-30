@@ -131,6 +131,37 @@ stand, and opens it on the file or folder named.
   code scrolls sideways at 390 px. The gutter columns keep one width in every row, so an indent
   is never a gutter wider than the row above.
 
+### Sharing
+
+People share a review in three ways, and each has a command that uses what they already have; a
+hosted service would mean storing other people's code, and sending mail through an API key would
+mean shipping a key in a plugin.
+
+- **A file** (`/inloop share [range]`): the page with a fixed light theme and the same review as
+  Markdown, in `.inloop/share/`, shown in the file manager (`open -R`, `xdg-open`, `explorer
+  /select,`). It is a single offline file, so it travels as a mail attachment and prints to PDF.
+- **A pull request comment** (`/inloop share pr [n]`): the notes of the pull request's commits as
+  Markdown (`review/markdown.ts`), under 60,000 characters (GitHub takes 65,536): line by line
+  goes first, then terms, then "what", then the oldest commits, and the text says what was left
+  out. Note text keeps its Markdown, but HTML in it shows as text and `@name` gets an invisible
+  joiner so nobody is notified. The level hides what the page would hide.
+  - A plain run writes the comment to `.inloop/share/pr-<n>.md`, with the pull request's head in
+    `pr-<n>.json`, and only reads from GitHub. `--yes` posts that file's text only when the head
+    is unchanged and the command was typed by a person (origin `composer`, `bridge` or `sdk`).
+  - The comment starts with `<!-- inloop -->`. inloop's earlier comment is the one by the same
+    login that starts with it (`gh api ... --jq`), and is replaced (PATCH) rather than joined by
+    another; `gh pr comment --edit-last` would edit whatever the person wrote last.
+  - The repository comes from the pull request's URL, never from `{owner}/{repo}`, which a fork
+    with an upstream remote can resolve differently. The body goes as a JSON file (`--input`), so
+    gh never reads it as a number or a boolean.
+- **A link** (December): a secret gist, previewed first in the same way.
+
+`/inloop review pr [n]` fetches `refs/pull/<n>/head` into `refs/inloop/pr-<n>` (from the remote
+that is the pull request's repository, else from its address) and reviews the pull request's
+commits with the files as they stand at that reference. `gh` and `git` run with
+`GIT_TERMINAL_PROMPT=0` and `GH_PROMPT_DISABLED=1`, so a missing login fails with a message
+instead of waiting for a password.
+
 ### The live view
 
 - The note tool's row and the recap tool's row in the transcript are drawn as cards
@@ -213,6 +244,6 @@ line under an answer, and the `/inloop` command's output in the terminal.
 |---|---|
 | A hook's own time | 10 s |
 | `$.fs.read` and `$.fs.write` | 4 MiB per file |
-| `$.process.run` | 30 s by default |
+| `$.process.run` | 30 s by default, 600 s at most; output cut at 4 MiB (`isStdoutTruncated`) |
 | `$.store` | 4 MiB of JSON in total |
 | Tree text | 100,000 characters |

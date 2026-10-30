@@ -16,6 +16,12 @@ The first version.
   each block of lines is there (git blame with the notes); light, dark and automatic themes;
   the open view or everything as PDF.
 - `/inloop explain [path]`: the same page on the code as it stands, opened on a file or folder.
+- `/inloop review pr [n]`: a pull request, fetched into `refs/inloop/pr-<n>` and reviewed as it
+  stands there.
+- `/inloop share`: the page and its Markdown in `.inloop/share/`, shown in the file manager to
+  attach to an email.
+- `/inloop share pr [n]`: a comment for the pull request, commit by commit, previewed first;
+  `--yes` posts it or updates inloop's earlier comment, through your own `gh`.
 - `/inloop:annotate`: explanations of existing code and of past commits.
 - Five levels of explanation (`/inloop level`), from `full` to `big-picture`; the page can hide
   detail down to the big picture.
