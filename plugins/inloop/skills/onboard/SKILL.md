@@ -15,6 +15,10 @@ Write everything as inloop notes (`mcp__inloop__note`, each with `"source": "rec
 end with one guide (`mcp__inloop__recap`). They appear in the transcript as cards and in
 `/inloop explain`, where each note sits beside the code it explains. Do not change any file.
 
+The user's tags may leave some fields out of everyday notes, and the note and recap tools then
+mark those "Only when an inloop skill asks". This skill asks for every field named below: fill
+them, with the item fields the tools list.
+
 ## Language
 
 Write in the language the inloop instructions in your system prompt name; when there are none,

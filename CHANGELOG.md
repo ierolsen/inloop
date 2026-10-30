@@ -29,8 +29,8 @@ The first version.
   `onboarding` tag for the project.
 - Tags decide what the notes hold (`/inloop tags`): `summary`, `review` (the default), `learn`,
   `decisions`, `architecture`, `onboarding`, `all`, combinable; Claude is asked for and offered
-  only their fields. On the page, a dialog turns tags off to hide parts. The levels of earlier
-  versions map onto tags.
+  only their fields, while `/inloop:annotate` and `/inloop:onboard` still fill every field. On the
+  page, a dialog turns tags off to hide parts. The levels of earlier versions map onto tags.
 - `bench/`: measures what inloop costs, task by task, against inloop off.
 - Comments on deleted lines give the reason each one goes; a recap's outcomes say what was found
   after a note's change, under the note and in the file's Changes.

@@ -424,7 +424,7 @@ test('/inloop explain shows the code of the file asked for, even in a project wi
 })
 
 // A session that wrote shapes.py and committed it as B on top of A, for the sharing tests
-async function committedShapes($: any, on: any) {
+async function committedShapes($: any, on: any, more: Record<string, unknown> = {}) {
   const A = 'a1'.repeat(20)
   const B = 'b2'.repeat(20)
   const SHAPES = 'class Rectangle:\n    def area(self):\n        return self.w * self.h\n'
@@ -432,7 +432,7 @@ async function committedShapes($: any, on: any) {
   const w = worldOf(on, { git })
   await $.session.start(START)
   await $.turn.start({ text: 'build', turnId: 't1' })
-  await $.tool.call({ ...note({ title: 'Shapes', files: ['shapes.py'], symbols: [{ name: 'Rectangle', kind: 'class', why_exists: 'holds sizes' }], lines: [{ anchor: 'return self.w * self.h', says: 'area is width times height, ask @erol' }] }), tool_use_id: 'n1' })
+  await $.tool.call({ ...note({ title: 'Shapes', files: ['shapes.py'], symbols: [{ name: 'Rectangle', kind: 'class', why_exists: 'holds sizes' }], lines: [{ anchor: 'return self.w * self.h', says: 'area is width times height, ask @erol' }], ...more }), tool_use_id: 'n1' })
   await $.tool.call({ tool: 'Write', tool_use_id: 'w1', file_path: ROOT + '/shapes.py', content: SHAPES } as any)
   w.shell = () => Object.assign(git, {
     'git rev-parse --verify --quiet HEAD': B + '\n',
@@ -469,6 +469,14 @@ test('/inloop share writes a light page and its Markdown to attach to an email, 
   expect(w.ran).toContain('xdg-open ' + ROOT + '/.inloop/share')
   expect(w.ran.filter((c) => c.startsWith('gh '))).toEqual([])
   expect((await $.command.run(command('share link'))).text).toStartWith('Sharing by link (a secret gist) comes in a later version.')
+})
+
+test('parts a skill wrote beyond the tags are on the page and in its Markdown', async ($, on) => {
+  // /inloop:onboard or /inloop:annotate under the default review tag fills terms, which learn names
+  const { w } = await committedShapes($, on, { terms: [{ term: 'dunder method', means: 'a method Python calls for an operator' }] })
+  await $.command.run(command('share'))
+  expect(w.files.get(ROOT + '/.inloop/share/inloop-work.html')).toContain('data-tags="review,learn"')
+  expect(w.files.get(ROOT + '/.inloop/share/inloop-work.md')).toContain('dunder method')
 })
 
 test('/inloop share pr shows a preview first, posts only with --yes typed by a person, and updates its own comment in place', async ($, on) => {

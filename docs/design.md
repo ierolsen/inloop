@@ -210,12 +210,19 @@ seniority. Each tag names parts of a note (`hooks/parts.ts`); every note keeps i
 | `all` | every part | the most detail, the most cost |
 
 Tags combine (`review,learn`), and their names are English in every language, like commands. The
-instructions hold only the rules of the chosen parts, and the note tool describes those parts in
-full and the others in one line ("Only when an inloop skill asks"), so Claude neither writes them
-nor reads their long descriptions with every request; `/inloop:annotate` and `/inloop:onboard`
-can still fill them. A change of tags registers the tools again, which rebuilds the prompt cache
-once. With the tools and instructions together, inloop adds about 1,600 tokens per request with
-`summary` and 3,100 with `all`, read from the cache after the first request.
+instructions hold only the rules of the chosen parts, and the note and recap tools describe those
+parts in full. The others keep one line ("Only when an inloop skill asks") and their item fields
+without descriptions, so Claude neither writes them nor reads their long descriptions with every
+request, while `/inloop:annotate` and `/inloop:onboard` can still fill them. The item fields stay
+because `cleanNote` and `cleanRecap` keep only the items with the keys they read: a skill left to
+guess could write `{question, answer}` for `{q, a}`, and the guide would lose its questions. A change of tags
+registers the tools again, which rebuilds the prompt cache once. With the tools and instructions
+together, inloop adds about 2,000 tokens per request with `summary`, 2,600 with `review` and 3,200
+with `all`, read from the cache after the first request.
+
+The page and its Markdown show the tags the notes were written with and, for parts a skill wrote
+beyond them, the tags that name those parts (`tagsShowing`), so nothing the notes hold is left out:
+after `/inloop:onboard` in a `review` session, which writes `terms`, they show `review, learn`.
 
 The levels of earlier versions map onto tags: `full` and `deep` to `all`, `guided` and `standard`
 to `review,learn`, `essentials` and `brief` to `review`, `design` to `decisions`, `big-picture` to
@@ -224,7 +231,8 @@ to `review,learn`, `essentials` and `brief` to `review`, `design` to `decisions`
 A first measurement (`bench/`, one run per task) found that the tags cut what Claude writes into
 the notes: about 300 tokens per change with `summary`, 400 to 550 with `review`, 600 to 1,300 with
 `all`. The total cost of a task varies more from run to run than the notes cost, so the totals
-need repeated runs.
+need repeated runs. Those runs used tools without the item fields of the parts left out, about 340
+tokens smaller per request with `summary` and 200 with `review`.
 
 A note is written the way a developer who speaks its language explains code to a colleague: that
 language's sentences, with every technical word in the form developers use, which is usually

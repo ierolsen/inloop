@@ -16,6 +16,10 @@ Write what you find as inloop notes with the `mcp__inloop__note` tool, each with
 `"source": "reconstructed"`, so they appear on the review page (`/inloop review`) and in the
 transcript as cards. Do not change any file while explaining.
 
+The user's tags may leave some fields out of everyday notes, and the note and recap tools then
+mark those "Only when an inloop skill asks". This skill asks for every field named below: fill
+them, with the item fields the tools list.
+
 ## Language
 
 Write the notes in the language the inloop instructions in your system prompt name. When there

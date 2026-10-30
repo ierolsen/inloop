@@ -1,8 +1,8 @@
 // Unit tests of inloop's plain modules: no events, no mods API.
 import { expect, test } from 'claude-code/testing'
-import { language, resolve, tags, languageName, fold } from '../hooks/config.ts'
-import { instructions, noteSpec, recapSpec, NOTE_SPEC } from '../hooks/instructions.ts'
-import { partsOf, tagsCovered } from '../hooks/parts.ts'
+import { language, resolve, tags, languageName, fold, TAGS, type Tag } from '../hooks/config.ts'
+import { instructions, noteSpec, recapSpec, NOTE_SPEC, RECAP_SPEC } from '../hooks/instructions.ts'
+import { partsOf, tagsShowing } from '../hooks/parts.ts'
 import { cleanNote, cleanRecap, relative, inside, sameFile, Pairing } from '../hooks/note.ts'
 import { diff, lines, isBinary } from '../hooks/diff.ts'
 import { redact, redactDeep, sensitive, REDACTED } from '../hooks/redact.ts'
@@ -244,13 +244,42 @@ test('each tag names the parts of a note it asks for; the tools describe those i
   expect(partsOf(['review']).note).toEqual(['lines', 'removed', 'symbols', 'alternatives', 'impact', 'risks'])
   expect(partsOf(['review', 'learn']).note).toEqual(['lines', 'removed', 'symbols', 'uses', 'parameters', 'terms', 'alternatives', 'impact', 'risks'])
   expect(partsOf(['onboarding']).recap).toContain('questions')
-  expect(tagsCovered(['impact', 'risks'])).toEqual(['summary', 'architecture'])
   // the summary tool keeps every field, so a skill can still fill them, but describes them in one line
   const summary = noteSpec(['summary']).inputSchema.properties as any
   expect(Object.keys(summary)).toEqual(Object.keys(NOTE_SPEC.inputSchema.properties))
-  expect(summary.terms).toEqual({ type: 'array', description: 'Only when an inloop skill asks.', items: { type: 'object' } })
-  expect((noteSpec(['learn']).inputSchema.properties as any).terms.items.properties.term).toBeDefined()
-  expect(JSON.stringify(noteSpec(['summary'])).length).toBeLessThan(JSON.stringify(noteSpec(['all'])).length * 0.5)
+  expect(summary.terms).toEqual({
+    type: 'array', description: 'Only when an inloop skill asks.',
+    items: { type: 'object', properties: { term: { type: 'string' }, means: { type: 'string' } }, required: ['term', 'means'] },
+  })
+  expect((noteSpec(['learn']).inputSchema.properties as any).terms.items.properties.term.description).toBeDefined()
+  expect(JSON.stringify(noteSpec(['summary'])).length).toBeLessThan(JSON.stringify(noteSpec(['all'])).length * 0.7)
   expect((recapSpec(['summary']).inputSchema.properties as any).setup.description).toBe('Only when an inloop skill asks.')
   expect(recapSpec(['summary']).inputSchema.required).toEqual(['overview'])
+})
+
+test('whatever the tags, a skill sees the keys inloop reads in every list of a note and a recap', async () => {
+  // cleanNote and cleanRecap drop an item without them, as { question, answer } for { q, a }
+  const keys = (v: any) => ({ properties: Object.keys(v.items.properties ?? {}), required: v.items.required ?? [] })
+  for (const chosen of [...TAGS.map((t) => [t]), ['review', 'learn']] as Tag[][]) {
+    for (const [spec, full] of [[noteSpec(chosen), NOTE_SPEC], [recapSpec(chosen), RECAP_SPEC]] as any[]) {
+      for (const [field, v] of Object.entries(full.inputSchema.properties) as [string, any][]) {
+        if (v.type !== 'array' || v.items.type !== 'object') continue
+        const got = spec.inputSchema.properties[field]
+        expect([chosen.join(','), field, keys(got)]).toEqual([chosen.join(','), field, keys(v)])
+        // a field the tags leave out has no description but its one line
+        if (got.description === 'Only when an inloop skill asks.') expect(JSON.stringify(got.items)).not.toContain('description')
+      }
+    }
+  }
+})
+
+test('the page and the Markdown show the tags the notes were written with, and those naming parts a skill added', async () => {
+  expect(tagsShowing(['review'])).toEqual(['review'])
+  expect(tagsShowing(['review'], ['lines', 'symbols', 'risks'])).toEqual(['review'])
+  // /inloop:onboard under review writes uses, parameters and terms, which learn names
+  expect(tagsShowing(['review'], ['lines', 'uses', 'parameters', 'terms'])).toEqual(['review', 'learn'])
+  // a tie goes to the tag with fewer parts: architecture (impact, risks) before review
+  expect(tagsShowing(['summary'], ['impact'])).toEqual(['summary', 'architecture'])
+  expect(tagsShowing(['summary'], ['lines', 'symbols', 'uses', 'parameters', 'terms', 'impact', 'risks'])).toEqual(['summary', 'architecture', 'onboarding'])
+  expect(tagsShowing(['all'], ['terms'])).toEqual(['all'])
 })

@@ -9,6 +9,7 @@ import { parseHunks, flat, current, type FilePatch, type Line } from './patch.ts
 import { place, segments, marks, markKey, type Mark, type Segment } from './anchor.ts'
 import { roleOf, type Role } from './roles.ts'
 import { TAGS, tags as parseTags, type Tag } from '../config.ts'
+import { PARTS, type Part } from '../parts.ts'
 
 export type GitCommit = { sha: string; parents: string[]; author: string; time: number; subject: string; body: string; files: FileData[] }
 // A file's patch with what was hidden on the way: secret values, the content of a secret file, or
@@ -62,6 +63,7 @@ export type Review = {
   links: Map<string, { href: string; title: string }> // a defined name to its place, for links from other lines
   counts: { commits: number; files: number; notes: number; unexplained: number }
   written: Tag[] | null // the tags the notes on the page were written with, all sessions together, when the logs say
+  present: Part[] // the parts the notes on the page hold, whatever the tags asked for
 }
 
 export { markKey }
@@ -205,6 +207,7 @@ export function build(src: Source): Review {
     index, links,
     counts: { commits: src.commits.length, files: seen.size, notes: used.size, unexplained: all.reduce((k, g) => k + g.files.filter((f) => f.tags.includes('unexplained')).length, 0) },
     written: written.size ? (written.has('all') ? ['all'] : TAGS.filter((t) => written.has(t))) : null,
+    present: PARTS.filter((p) => [...used].some((id) => ((notes.get(id)!.record.note[p] as unknown[] | undefined) ?? []).length)),
   }
 
   function group(kind: Group['kind'], id: string, c: GitCommit | null, index: number, refs: NoteRef[], files: FileData[], outsidePaths: Set<string>, edited: Set<string>): Group {

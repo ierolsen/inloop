@@ -3,6 +3,7 @@
 
 import { resolve, language as parseLanguage, tags as parseTags, adhd as parseAdhd, languageName, TAGS, type Settings, type Tag } from './config.ts'
 import { instructions, noteSpec, recapSpec } from './instructions.ts'
+import { tagsShowing } from './parts.ts'
 import { cleanNote, cleanRecap, relative, inside, sameFile, Pairing } from './note.ts'
 import { diff, isBinary } from './diff.ts'
 import { redact, redactDeep, sensitive } from './redact.ts'
@@ -676,6 +677,10 @@ function modelOf(s: Scope, all: LogRecord[], explained: { path: string; text: st
   return buildReview({ records: all, commits: s.found.commits, more: s.found.more, pending: s.pending, explained, git, scope: s.scope, range: s.range, pr: s.pr ?? null, project: project() })
 }
 
+// The tags a page or its Markdown shows: those the notes were written with (else the setting's),
+// and the ones naming parts a skill wrote beyond them
+const shownTags = (model: Review) => tagsShowing(model.written ?? settings.tags.value, model.present)
+
 // command: the command as the person would type it again, for the page's footer
 type Page = { theme: Theme; mode: Mode; extra: string[]; start: string | null; command: string }
 
@@ -685,7 +690,7 @@ async function pageOf($: any, model: Review, end: string | null, page: Page): Pr
   const { states, info } = await fileStates($, model, end, page.extra)
   const explorer = explore(model, states, info)
   return fitReview(model, explorer, labels(code), {
-    code, theme: page.theme, version: VERSION, tags: model.written ?? settings.tags.value, written: !!model.written, mode: page.mode, start: page.start,
+    code, theme: page.theme, version: VERSION, tags: shownTags(model), written: !!model.written, mode: page.mode, start: page.start,
     command: page.command, made: now(),
   })
 }
@@ -814,7 +819,7 @@ async function share($: any, what: string, theme: Theme, l: Labels): Promise<str
   const model = modelOf(s, all, await explainedFiles($, all))
   const code = shownIn(settings.language.code)
   const command = ('/inloop share ' + what).trim()
-  const text = markdown(model, labels(code), { code, tags: model.written ?? settings.tags.value, version: VERSION, marker: false, max: SHARE_MD_MAX, command, made: now() }).text
+  const text = markdown(model, labels(code), { code, tags: shownTags(model), version: VERSION, marker: false, max: SHARE_MD_MAX, command, made: now() }).text
   const { html, cut } = await pageOf($, model, s.end, { theme: theme === 'auto' ? 'light' : theme, mode: 'review', extra: [], start: null, command })
   const name = 'inloop-' + project().replace(/[^\w.-]+/g, '_').slice(0, 40) + (what ? '-' + nameOfRange(what).replace(/^review-?/, '') : '')
   const page = shareFile(name + '.html')
@@ -834,7 +839,7 @@ async function preview($: any, pr: Pr, l: Labels): Promise<string> {
   const s: Scope = { scope: 'range', range: 'pr-' + pr.number, found: got, pending: null, end: pr.head, pr: { number: pr.number, title: pr.title } }
   const model = modelOf(s, all, [])
   const code = shownIn(settings.language.code)
-  const { text, cut } = markdown(model, labels(code), { code, tags: model.written ?? settings.tags.value, version: VERSION, marker: true, max: COMMENT_MAX, command: '/inloop review pr ' + pr.number, made: now() })
+  const { text, cut } = markdown(model, labels(code), { code, tags: shownTags(model), version: VERSION, marker: true, max: COMMENT_MAX, command: '/inloop review pr ' + pr.number, made: now() })
   const comment = await ownComment($, pr)
   const md = shareFile('pr-' + pr.number + '.md')
   await keepOutOfGit($)

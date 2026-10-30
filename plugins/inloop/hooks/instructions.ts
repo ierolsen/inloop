@@ -64,6 +64,9 @@ function adhdRules(parts: Part[]): string {
   ].join('\n')
 }
 
+// how the tools describe a field the tags leave out
+const OFF = 'Only when an inloop skill asks.'
+
 export function instructions(plugin: string, lang: Language, tags: Tag[], adhd = false): string {
   const note = 'mcp__' + plugin + '__' + NOTE_TOOL
   const recap = 'mcp__' + plugin + '__' + RECAP_TOOL
@@ -80,7 +83,7 @@ export function instructions(plugin: string, lang: Language, tags: Tag[], adhd =
     '- Write like a developer who speaks ' + lang.english + ' explaining code to a colleague: ' + lang.english + ' sentences, with every technical word in the form developers use, which is usually English. This holds in every field and for every kind of technical word: what things are (seed, split, pipeline, cache, endpoint), what code does (shuffle, fit, deploy, merge, retry) and how it behaves (reproducible, deterministic, idempotent). Never replace a technical word with an everyday ' + lang.english + ' paraphrase or a word-for-word translation, not even to make a sentence easier; ' + termsHint + (example(lang.code) ? ' ' + example(lang.code) : ''),
     '- `tldr` is the one thing to remember about the change, in one short sentence that says what changes and why (for example: "households goes: the model already sees Population and AveOccup, and the column only repeats them"). `what` says what the change does, for a reader who did not write the code, and names everything it removes. `why` gives the reason for this approach in your own words: when the user asked for the change, say so, and still give the technical reason it is right, or your doubt. Set `basis` to "verified" when a test, a measurement or documentation you read supports the reason, and to "judgment" when it is your own choice.',
     ...parts.map((p) => '- ' + PART_RULES[p]),
-    '- The user chose the tags ' + tags.join(', ') + ' for these notes. ' + tags.map((t) => TAG_RULES[t]).join(' ') + ' Write only the fields the note tool offers: the others are left out on purpose, to keep notes short and cheap.',
+    '- The user chose the tags ' + tags.join(', ') + ' for these notes. ' + tags.map((t) => TAG_RULES[t]).join(' ') + ' Fill only the fields the note and recap tools describe in full. Leave the ones they mark "' + OFF + '" empty unless an inloop skill (/inloop:annotate, /inloop:onboard) asks for them: they are left out on purpose, to keep notes short and cheap.',
     '- When you finish a task that changed files, call `' + recap + '` once: an overview' + recapParts.map((r) => ', ' + RECAP_RULES[r]).join('') + '. Write it in the same language as the notes.',
     '- Prefer the Edit and Write tools for changing files. When you must change files with a shell command, call `' + note + '` before that command too.',
     '- Never put secrets, tokens or passwords in a note or a recap.',
@@ -207,14 +210,20 @@ const RECAP_FULL = {
   },
 }
 
+// A schema without its descriptions
+function bare(v: any): any {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return v
+  return Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'description').map(([k, x]) =>
+    [k, k === 'properties' ? Object.fromEntries(Object.entries(x as object).map(([name, f]) => [name, bare(f)])) : bare(x)]))
+}
+
 // A tool's definition for the session's tags: the fields the tags name keep their full description;
-// the others stay in the schema, so /inloop:annotate and /inloop:onboard can still fill them, but
-// with one short line and no item fields, so Claude leaves them out and the definition sent with
-// every request stays small.
-const OFF = 'Only when an inloop skill asks.'
+// the others keep one short line and their item fields without descriptions. Claude leaves them
+// out and the definition sent with every request stays small, while /inloop:annotate and
+// /inloop:onboard fill them with the keys inloop reads (an item with other keys is dropped).
 function trim<T extends { inputSchema: { properties: Record<string, any> } }>(spec: T, keep: string[]): T {
   const short = (v: any) => {
-    const compact = { type: 'array', description: OFF, items: { type: v.items?.type ?? 'string' } }
+    const compact = { type: 'array', description: OFF, items: bare(v.items ?? { type: 'string' }) }
     return JSON.stringify(compact).length < JSON.stringify(v).length ? compact : v
   }
   const properties = Object.fromEntries(Object.entries(spec.inputSchema.properties).map(([k, v]) => [k, keep.includes(k) ? v : short(v)]))

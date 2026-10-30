@@ -7,8 +7,8 @@ they cost tokens and time. This folder measures how much, so the number can be s
 
 | Part | What it is | How it is billed |
 |---|---|---|
-| Instructions | inloop's section of the system prompt, about 1,100 tokens | Sent with every request, read from the prompt cache after the first one |
-| Tool definitions | the `note` and `recap` tools, about 1,900 tokens | The same as the instructions |
+| Instructions | inloop's section of the system prompt: about 700 tokens with `summary`, 1,000 with `review`, 1,300 with `all` | Sent with every request, read from the prompt cache after the first one |
+| Tool definitions | the `note` and `recap` tools: about 1,300 tokens with `summary`, 1,500 with `review`, 1,900 with `all` | The same as the instructions |
 | Notes and recaps | what Claude writes into them | Output tokens, the most expensive kind; grows with the size of the change |
 | Behavior | with notes to write, Claude may read or check a little more | Included in the totals below |
 | Send-backs | a note with a word-for-word translation of a term goes back once | Output tokens |
@@ -66,4 +66,6 @@ general.
   against the plan's usage limits instead.
 
 Results are in `results/`, one folder per run of the suite, with every run in `runs.json` and the
-tables in `report.md`.
+tables in `report.md`. The `summary` and `review` runs in `results/2026-10-30-pilot` were measured
+before the tools kept the item fields of the parts a tag leaves out, which added about 340 tokens
+per request with `summary` and 200 with `review`, read from the cache.
