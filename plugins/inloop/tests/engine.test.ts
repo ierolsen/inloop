@@ -107,23 +107,23 @@ test('/inloop lang and tags change the next instructions, for all projects or fo
   expect(await written()).toContain('English')
 
   // the reply comes in the new language, which has labels of its own
-  expect((await $.command.run(command('lang Türkçe'))).text).toBe('inloop notlarının dili bundan sonra tüm projelerde: Türkçe.')
+  expect((await $.command.run(command('lang Türkçe'))).text).toBe('inloop notlarının dili bundan sonra tüm projelerde: Türkçe.\nDaha önce yazılmış notlar yazıldıkları dilde kalır; inloop onları çevirmez.')
   expect(await written()).toContain('Turkish (Türkçe)')
 
-  expect((await $.command.run(command('lang de --project'))).text).toBe('Sprache der inloop-Notizen ab jetzt, in diesem Projekt: Deutsch.')
+  expect((await $.command.run(command('lang de --project'))).text).toBe('Sprache der inloop-Notizen ab jetzt, in diesem Projekt: Deutsch.\nSchon geschriebene Notizen bleiben in ihrer Sprache; inloop übersetzt sie nicht.')
   expect(JSON.parse(w.files.get(ROOT + '/.inloop/config.json') ?? '{}')).toEqual({ language: 'de' })
   expect(await written()).toContain('German (Deutsch)')
 
   // the project's own choice comes first, and the command says so
   expect((await $.command.run(command('lang nl'))).text).toBe('Sprache der inloop-Notizen ab jetzt, in allen Projekten: Niederländisch (Nederlands).\n' +
-    'Dieses Projekt hat eine eigene Wahl, Deutsch, die hier Vorrang hat; /inloop lang reset --project entfernt sie.')
+    'Dieses Projekt hat eine eigene Wahl, Deutsch, die hier Vorrang hat; /inloop lang reset --project entfernt sie.\nSchon geschriebene Notizen bleiben in ihrer Sprache; inloop übersetzt sie nicht.')
   expect((await $.command.run(command('lang reset --project'))).text).toBe('De inloop-notities zijn weer in Nederlands (je instelling voor alle projecten).')
   // the plugin's own setting (its default, English, as /config shows it) is what reset goes back to
   expect((await $.command.run(command('lang reset'))).text).toBe('inloop notes are in English again (default).')
   expect((await $.command.run(command('lang'))).text).toBe('Name a language, as in /inloop lang Turkish or /inloop lang de.')
   // a language with no labels: the notes are in it, inloop's own messages stay English
   expect((await $.command.run(command('lang Japanese'))).text).toBe('From now on inloop notes are in Japanese (日本語), in all your projects.\n' +
-    'inloop has no labels in Japanese (日本語) yet, so its own messages stay in English; the notes themselves are in Japanese (日本語).')
+    'inloop has no labels in Japanese (日本語) yet, so its own messages stay in English; the notes themselves are in Japanese (日本語).\nNotes already written keep the language they were written in; inloop does not translate them.')
   expect(await written()).toContain('Japanese (日本語)')
   await $.command.run(command('lang reset'))
 
@@ -150,6 +150,9 @@ test('/inloop lang and tags change the next instructions, for all projects or fo
   expect((await $.command.run(command('level full'))).text).toBe('From now on inloop notes hold: all, in all your projects.')
   expect((await $.command.run(command('detail standard'))).text).toBe('From now on inloop notes hold: review, learn, in all your projects.')
   expect((await $.command.run(command('tags reset'))).text).toBe('inloop notes hold review again (default).')
+  // a tag typed as a command names the command that sets it
+  expect((await $.command.run(command('learn'))).text).toBe('"/inloop learn" is not a command. For new notes that hold learn: /inloop tags learn, or /inloop tags review,learn to keep what they hold now.')
+  expect((await $.command.run(command('all'))).text).toBe('"/inloop all" is not a command. For new notes that hold all: /inloop tags all.')
   expect((await $.command.run(command('fly'))).text).toStartWith('inloop has no command "fly".\ninloop commands:')
 })
 
@@ -526,7 +529,7 @@ test('parts a skill wrote beyond the tags are on the page and in its Markdown', 
   expect(html).toContain('data-tags="review,learn"')
   // the dialog marks only the session's own tag as written
   expect(html).toContain('<span class="n">review</span><span class="badge new">written</span>')
-  expect(html).toContain('<span class="n">learn</span><span class="d">')
+  expect(html).toContain('<span class="n">learn</span><span class="badge">partly in these notes</span>')
   expect(w.files.get(ROOT + '/.inloop/share/inloop-work.md')).toContain('dunder method')
 })
 

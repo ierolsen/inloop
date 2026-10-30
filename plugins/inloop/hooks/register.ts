@@ -1254,6 +1254,7 @@ export function register(on: any, pluginOptions: any) {
       const said = [say(project ? after.lang_project : after.lang_user, { language: nameOf(lang, ui) })]
       if (!project && settings.language.source === 'project') said.push(say(after.lang_project_wins, { language: nameOf(settings.language, ui) }))
       if (!hasLabels(lang.code)) said.push(say(after.lang_no_labels, { language: nameOf(lang, ui) }))
+      said.push(after.lang_kept)
       return { text: said.join('\n') }
     }
     // onboarding: notes in this project explain for someone new to the codebase; the tour itself
@@ -1294,6 +1295,12 @@ export function register(on: any, pluginOptions: any) {
       const said = [project ? (wanted ? after.adhd_on_project : after.adhd_off_project) : (wanted ? after.adhd_on_user : after.adhd_off_user)]
       if (!project && settings.adhd.source === 'project') said.push(say(after.adhd_project_wins, { state: settings.adhd.value ? after.state_on : after.state_off }))
       return { text: said.join('\n') }
+    }
+    // a tag typed as a command, as in /inloop learn: the command that sets it
+    if ((TAGS as string[]).includes(command)) {
+      const tag = command as Tag
+      const both = tag === 'all' ? [] : TAGS.filter((t) => t === tag || (t !== 'all' && settings.tags.value.includes(t)))
+      return { text: both.length > 1 ? say(l.tags_not_command, { tag, both: both.join(',') }) : say(l.tags_not_command_one, { tag }) }
     }
     return { text: say(l.unknown, { command }) + '\n' + l.help }
   }).catch(async () => ({ text: 'inloop could not run that command.' }))

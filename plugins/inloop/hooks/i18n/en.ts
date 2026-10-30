@@ -55,6 +55,7 @@ export const en = {
   off: 'inloop is off for this session: Claude is no longer asked for notes, and edits are not recorded. /inloop on turns it back on.',
   lang_user: 'From now on inloop notes are in {language}, in all your projects.',
   lang_project: 'From now on inloop notes are in {language}, in this project.',
+  lang_kept: 'Notes already written keep the language they were written in; inloop does not translate them.',
   lang_reset: 'inloop notes are in {language} again ({source}).',
   lang_missing: 'Name a language, as in /inloop lang Turkish or /inloop lang de.',
   lang_project_wins: 'This project has its own choice, {language}, which comes first here; /inloop lang reset --project removes it.',
@@ -111,6 +112,8 @@ export const en = {
   r_terms: 'Terms',
   r_impact: 'Impact',
   unknown: 'inloop has no command "{command}".',
+  tags_not_command: '"/inloop {tag}" is not a command. For new notes that hold {tag}: /inloop tags {tag}, or /inloop tags {both} to keep what they hold now.',
+  tags_not_command_one: '"/inloop {tag}" is not a command. For new notes that hold {tag}: /inloop tags {tag}.',
   not_ready: 'inloop has not started in this session yet.',
 
   // the review page
@@ -279,8 +282,12 @@ export const en = {
   x_tags: 'Tags',
   x_tags_title: 'What the notes hold',
   x_tags_written: 'written',
-  x_tags_hint: 'The notes were written with {tags}. Turning a tag off hides its parts; turning one on shows only what the notes already hold. /inloop:annotate writes more for a file.',
-  x_tags_hint_setting: 'Your tags for new notes are {tags}. Turning a tag off hides its parts; turning one on shows only what the notes already hold.',
+  x_tags_hint: 'The notes were written with {tags}. Tags decide what Claude writes into the notes: to change them for the next notes, type /inloop tags in Claude Code. Here you can hide parts of what was written. /inloop:annotate <file> explains code as it is now, with every part.',
+  x_tags_hint_setting: 'Your tags for new notes are {tags}. Tags decide what Claude writes into the notes: to change them for the next notes, type /inloop tags in Claude Code. Here you can hide parts of what was written.',
+  x_tags_full: 'in these notes',
+  x_tags_partly: 'partly in these notes',
+  x_tags_none: 'not in these notes',
+  x_tags_get: 'For new notes:',
 }
 
 export type Labels = typeof en

@@ -506,14 +506,23 @@ function appbar(c: Ctx): string {
     '<button type="button" data-print>' + esc(l.r_print) + '</button><button type="button" data-print-all>' + esc(l.x_print_all) + '</button></div></header>'
 }
 
-// The tags to choose from, each with what it adds; the tags the page opens with are pressed, and
-// those the notes were written with marked. Turning tags off hides parts; turning one on shows only
-// what the notes hold.
+// The tags to choose from, each with what it adds; the tags the page opens with are pressed. Each
+// says whether the notes hold it: written with it, or its parts there in full, in part or not at all.
+// A tag whose parts are missing names the command that has Claude write them into the next notes,
+// keeping the tags chosen now. Turning tags off hides parts; turning one on shows only what the
+// notes hold.
 function tagsDialog(c: Ctx): string {
-  const { l, o } = c
+  const { l, o, r } = c
   const parts = Object.fromEntries(TAGS.map((t) => [t, PARTS_OF[t].note]))
+  const present = new Set(r.present)
+  const written = (t: Tag) => o.written && o.chosen.includes(t)
+  const have = (t: Tag) => PARTS_OF[t].note.filter((p) => present.has(p)).length
+  const state = (t: Tag) => written(t) ? badge(l.x_tags_written, 'new')
+    : badge(have(t) === PARTS_OF[t].note.length ? l.x_tags_full : have(t) ? l.x_tags_partly : l.x_tags_none)
+  const command = (t: Tag) => '/inloop tags ' + (t === 'all' ? 'all' : TAGS.filter((x) => x === t || (x !== 'all' && o.chosen.includes(x))).join(','))
+  const get = (t: Tag) => written(t) || have(t) === PARTS_OF[t].note.length ? '' : '<span class="g">' + esc(l.x_tags_get) + ' <code>' + esc(command(t)) + '</code></span>'
   const items = TAGS.map((t) => '<li><button type="button" data-tag-choice="' + t + '" aria-pressed="' + String(o.tags.includes(t)) + '"><span class="n">' + t + '</span>' +
-    (o.written && o.chosen.includes(t) ? badge(l.x_tags_written, 'new') : '') + '<span class="d">' + esc(l[('tag_desc_' + t) as 'tag_desc_review']) + '</span></button></li>')
+    state(t) + '<span class="d">' + esc(l[('tag_desc_' + t) as 'tag_desc_review']) + '</span>' + get(t) + '</button></li>')
   return '\n<dialog class="tags-modal" id="tags" aria-labelledby="tags-title" data-parts="' + esc(JSON.stringify(parts)) + '"><div class="tags-in"><div class="tags-head"><h2 id="tags-title">' + esc(l.x_tags_title) + '</h2>' +
     '<button type="button" class="x" data-tags-close aria-label="' + esc(l.x_close) + '">&times;</button></div>' + hint(say(o.written ? l.x_tags_hint : l.x_tags_hint_setting, { tags: o.chosen.join(', ') })) +
     '<ul class="tags-list">' + items.join('') + '</ul></div></dialog>'

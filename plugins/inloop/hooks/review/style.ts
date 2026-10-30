@@ -90,6 +90,8 @@ ul.tags-list button[aria-pressed="true"] { border-color: var(--accent); backgrou
 ul.tags-list .n { font-weight: 650; }
 ul.tags-list .badge { justify-self: end; }
 ul.tags-list .d { grid-column: 1 / -1; color: var(--muted); font-size: 13.5px; }
+ul.tags-list .g { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; }
+ul.tags-list .g code { font-family: ${MONO}; font-size: 12px; background: var(--code-line); border-radius: 4px; padding: 1px 5px; color: var(--ink); }
 ul.tags-list .n { font-family: ${MONO}; font-size: 14px; }
 ul.tags-list button[aria-pressed="true"] .n::before { content: "\\2713  "; color: var(--accent); }
 .drawer-btn, .drawer-close { display: none; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; background: var(--panel); }

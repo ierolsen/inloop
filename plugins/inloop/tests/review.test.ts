@@ -409,11 +409,15 @@ test('a dialog chooses the tags: every tag in English with what it adds, the tag
   const dialog = html.split('<dialog')[1].split('</dialog>')[0]
   expect(dialog.match(/data-tag-choice="/g)?.length).toBe(7)
   expect(dialog).toContain('<button type="button" data-tag-choice="review" aria-pressed="true"><span class="n">review</span><span class="badge new">yazıldı</span>')
-  expect(dialog).toContain('<button type="button" data-tag-choice="summary" aria-pressed="false"><span class="n">summary</span><span class="d">Her değişikliğin özü: ne değişti ve neden')
+  expect(dialog).toContain('<button type="button" data-tag-choice="summary" aria-pressed="false"><span class="n">summary</span><span class="badge">bu notlarda var</span><span class="d">Her değişikliğin özü: ne değişti ve neden')
   expect(dialog).toContain('&quot;decisions&quot;:[&quot;alternatives&quot;,&quot;impact&quot;,&quot;risks&quot;]')
   // a skill wrote learn's parts in a review session: both are pressed, only review is marked written
   const more = render(r, explore(r, STATES as any, INFO), labels('en'), { ...OPTIONS, chosen: ['review'] }).split('<dialog')[1]
-  expect(more).toContain('<button type="button" data-tag-choice="learn" aria-pressed="true"><span class="n">learn</span><span class="d">')
+  expect(more).toContain('<button type="button" data-tag-choice="learn" aria-pressed="true"><span class="n">learn</span><span class="badge">partly in these notes</span>')
+  // what is missing names the command that has Claude write it into the next notes, keeping review
+  expect(more).toContain('<span class="g">For new notes: <code>/inloop tags review,learn</code></span>')
+  expect(more).toContain('<span class="n">all</span><span class="badge">partly in these notes</span><span class="d">Everything the other tags hold: nearly every line, every term and parameter.</span><span class="g">For new notes: <code>/inloop tags all</code></span>')
+  expect(more).toContain('Tags decide what Claude writes into the notes: to change them for the next notes, type /inloop tags in Claude Code.')
   expect(more).toContain('<span class="n">review</span><span class="badge new">written</span>')
   expect(more).toContain('The notes were written with review. ')
   // with every mark part hidden the code takes the width
