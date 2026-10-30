@@ -13,6 +13,7 @@ import { highlight, languageOf } from '../hooks/review/highlight.ts'
 import { place, segments } from '../hooks/review/anchor.ts'
 import { build } from '../hooks/review/review.ts'
 import { render, fit } from '../hooks/review/page.ts'
+import { explore, parseBlame, slug, fileId, dirId, folders } from '../hooks/review/explorer.ts'
 import { roleOf, fixedOrder } from '../hooks/review/roles.ts'
 import { bytes } from '../hooks/log.ts'
 
@@ -162,32 +163,125 @@ test('commits find their notes by record, by a reconstructed note\'s commit, and
   expect(r.counts.commits).toBe(4)
 })
 
-test('the page puts each explanation beside its line, in the reader\'s language, and loads nothing', async () => {
-  const html = render(build(source()), labels('tr'), { code: 'tr', theme: 'auto', version: '0.1.0' })
-  expect(html).toContain('<html lang="tr">')
-  expect(html).toContain("default-src 'none'")
-  expect(html.split('<script>').length).toBe(3) // the theme boot and the page's script, nothing else
-  expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
-  for (const word of ['Review: Claude neyi değiştirdi, neden', 'Commit 1 / 4', 'Henüz commitlenmedi', 'Sonradan açıklanan kod', 'Sınıf ve fonksiyon dizini', 'Otomatik', 'PDF olarak kaydet',
-    'kaynak: shapes.py', 'picks the <strong>biggest</strong>', 'Bu commit için inloop notu yok', '<code>/inloop:explain f6f6f6f</code>', 'içerik kaydedilmedi', '1 gizli değer saklandı', 'Elle kontrol edilecekler', 'Added <strong>shapes</strong>.', 'Terimler', '<dt>random seed</dt>', 'Etkisi', 'app.py relies on largest()']) {
-    expect(html, word).toContain(word)
-  }
-  // the numbered pin beside the code, the code highlighted, and the name linked from another file
-  expect(html).toContain('<td class="p"><span class="pin">1</span></td><td class="m">+</td><td class="c"><span class="t-k">class</span> <span class="t-f">Rectangle</span>:</td>')
-  expect(html).toContain('<a class="xref" href="#c-b2b2b2b2-f0-1" title="holds sizes">Rectangle</a>')
-  expect(html).not.toContain('\u2014')
-  const dark = render(build(source()), labels('en'), { code: 'en', theme: 'dark', version: '0.1.0' })
-  expect(dark).toContain('<html lang="en" data-theme="dark" data-fixed>')
-  expect(dark).toContain('Commit 1 of 4')
-  expect(dark).toContain('2 older commits in this range are not shown.')
+// The files of that history as they stand, and which commit last wrote each line: a later change
+// not committed yet rewrote the line of shapes.py that a note was about.
+const SHAPES_NOW = 'class Rectangle:\n    def area(self):\n        return self.w * self.h\n\ndef largest(rects, key=None):\n'
+const APP_NOW = 'from shapes import Rectangle, largest\ndef main():\n    print(largest([Rectangle()]).area())\nmain()\n'
+const P = '0000000000000000000000000000000000000000'
+const stateOf = (path: string, text: string | null, blame: string[] | null, hidden: any = null) => ({ path, text, hidden, blame })
+const STATES = [
+  stateOf('shapes.py', SHAPES_NOW, ['b2b2b2b2', 'b2b2b2b2', 'b2b2b2b2', 'b2b2b2b2', P]),
+  stateOf('other.py', 'x = 1', ['c3c3c3c3']),
+  stateOf('fix.py', 'y = 2', ['d4d4d4d4']),
+  stateOf('README.md', 'hi', ['f6f6f6f6']),
+  stateOf('app.py', APP_NOW, [P, 'a1a1a1a1', P, 'a1a1a1a1']),
+  stateOf('.env', null, null, 'sensitive'),
+  stateOf('util.py', 'def helper():\n    return 1\n', ['a1a1a1a1', 'a1a1a1a1']),
+  stateOf('docs/old/notes.md', null, null, 'deleted'),
+]
+const INFO = new Map([['a1a1a1a1', { summary: 'chore: start', time: 1_600_000_000_000 }]])
+const OPTIONS = { code: 'tr', theme: 'auto' as const, version: '0.1.0', level: 'guided' as const, mode: 'review' as const, start: null }
+
+// Every anchor once, and every link inside the page lands on one: a link to nothing would quietly
+// show the overview instead.
+function linksHold(page: string) {
+  const html = page.replace(/<script>[\s\S]*?<\/script>/g, '')
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1])
+  expect(ids.filter((id, i) => ids.indexOf(id) !== i), 'anchors used twice').toEqual([])
+  const known = new Set(ids)
+  expect([...html.matchAll(/href="#([^"]*)"/g)].map((m) => m[1]).filter((h) => !known.has(h)), 'links to nothing').toEqual([])
+}
+
+test('blame says which commit wrote each line; explanations sit only on lines no later commit rewrote', async () => {
+  const porcelain = [
+    'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2 1 1 2', 'author E', 'committer-time 1700000000', 'summary feat: add shapes', 'filename shapes.py', '\tclass Rectangle:',
+    'b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2 2 2', '\t    def area(self):',
+    '0000000000000000000000000000000000000000 3 3 1', 'author Not Committed Yet', 'committer-time 1700000500', 'summary Version of shapes.py from shapes.py', 'filename shapes.py', '\tsummary of the area',
+  ].join('\n')
+  const parsed = parseBlame(porcelain)
+  expect(parsed.lines).toEqual(['b2'.repeat(20), 'b2'.repeat(20), P])
+  expect(parsed.info.get('b2'.repeat(20))).toEqual({ summary: 'feat: add shapes', time: 1_700_000_000_000 })
+  expect(slug('src/a b/Ünï.py')).toMatch(/^src-a-b-n-py-[0-9a-z]+$/)
+  expect(fileId('x.py')).not.toBe(fileId('x-py'))
+
+  const r = build(source())
+  const x = explore(r, STATES as any, INFO)
+  const shapes = x.byPath.get('shapes.py')!
+  // the class is on its line; the comment about "def largest" lost its line to the change not committed
+  expect([...shapes.pins.keys()]).toEqual(['n1:symbol:0'])
+  expect(shapes.moved.map((m) => [m.mark.kind, m.group.id, m.href])).toEqual([['line', 'c-b2b2b2b2', '#c-b2b2b2b2-f0-2']])
+  expect(shapes.why.map((w) => [w.from, w.to, w.title, w.href, w.mine])).toEqual([[0, 3, 'Shapes', '#c-b2b2b2b2', true], [4, 4, '', '#pending', true]])
+  // the borrowed name sits on the import, a line the work not committed wrote
+  const app = x.byPath.get('app.py')!
+  expect([...app.pinAt]).toEqual([[0, [1]]])
+  expect(app.why.map((w) => [w.from, w.to, w.title, w.mine])).toEqual([[0, 0, '', true], [1, 1, 'chore: start', false], [2, 2, '', true], [3, 3, 'chore: start', false]])
+  expect(x.byPath.get('util.py')!.pins.get('n4:symbol:0')).toBe(1)
+  // the tree: folders first, a file's status, the notes that explain it, and its last change
+  expect(x.root.children.map((n) => [n.name, n.kind, n.status, n.notes])).toEqual([
+    ['docs', 'dir', null, 0], ['.env', 'file', 'added', 0], ['app.py', 'file', 'modified', 1], ['fix.py', 'file', 'added', 1], ['other.py', 'file', 'added', 1],
+    ['README.md', 'file', 'added', 0], ['shapes.py', 'file', 'added', 1], ['util.py', 'file', null, 1],
+  ])
+  expect(x.root.children[0].children[0].children[0]).toMatchObject({ path: 'docs/old/notes.md', status: 'deleted' })
+  expect(x.root.last?.href).toBe('#pending')
+  expect(folders(x.root).map((n) => dirId(n.path))).toEqual(['d-root', dirId('docs'), dirId('docs/old')])
 })
 
-test('a page over its budget leaves out the code of its longest files first', async () => {
-  const big = added('big.py', Array.from({ length: 600 }, (_, i) => 'v' + i + ' = ' + 'x'.repeat(80)).join('\n'))
+test('the explorer: a tree of files, each with its code, its changes and why each line is there', async () => {
+  const r = build(source())
+  const x = explore(r, STATES as any, INFO)
+  const html = render(r, x, labels('tr'), OPTIONS)
+  linksHold(html)
+  expect(html).toContain('<html lang="tr" data-level="guided" data-start="overview">')
+  expect(html).toContain("default-src 'none'")
+  expect(html.split('<script>').length).toBe(3) // the theme boot and the page's script, nothing else
+  expect(html).toContain('body:not(:has(:target)) #overview { display: block; }')
+  expect(html).toContain('[data-level="essentials"] .lv-param')
+  expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+  for (const word of ['Review: Claude neyi değiştirdi, neden', 'Commit 1 / 4', 'Henüz commitlenmedi', 'Sonradan açıklanan kod', 'Sınıf ve fonksiyon dizini', 'Otomatik', 'PDF olarak kaydet',
+    'Dosyaya git', 'Genel bakış', 'Değişiklikler', 'Neden', 'Son değişiklik', 'Hepsini PDF yap', 'tam anlatım', 'büyük resim', 'bu review&#39;da yok', 'Açıklanmış ama satırları sonradan değişmiş',
+    'kaynak: shapes.py', 'picks the <strong>biggest</strong>', 'Bu commit için inloop notu yok', '<code>/inloop:annotate f6f6f6f</code>', 'içerik kaydedilmedi', '1 gizli değer saklandı',
+    'Elle kontrol edilecekler', 'Added <strong>shapes</strong>.', 'Terimler', '<dt>random seed</dt>', 'Etkisi', 'app.py relies on largest()', '<code>/inloop:annotate README.md</code>']) {
+    expect(html, word).toContain(word)
+  }
+  const shapes = fileId('shapes.py')
+  // the tree, a folder holding one folder on one line, and the views of a file
+  expect(html).toContain('<li class="leaf" data-path="shapes.py"><a href="#' + shapes + '">')
+  expect(html).toContain('<a href="#' + dirId('docs/old') + '">docs/old</a>')
+  for (const id of [shapes, shapes + '_changes', shapes + '_why', dirId('docs/old'), 'd-root', 'c-b2b2b2b2', 'pending', 'explained', 'index']) expect(html, id).toContain('<section class="view" id="' + id + '"')
+  // the code as it stands: one line number, the pin beside it, and links to the definition in it
+  expect(html).toContain('<tr id="' + shapes + '_L1"><td class="n">1</td><td class="p"><span class="pin lv-symbol">1</span></td><td class="c"><span class="t-k">class</span> <span class="t-f">Rectangle</span>:</td></tr>')
+  expect(html).toContain('<a class="xref" href="#' + shapes + '_1" title="holds sizes">Rectangle</a>')
+  // the diff in its commit keeps two numbers and the mark of each line
+  expect(html).toContain('<td class="o"></td><td class="n">1</td><td class="p"><span class="pin lv-symbol">1</span></td><td class="m">+</td>')
+  const en = render(build(source()), explore(build(source()), STATES as any, INFO), labels('en'), { ...OPTIONS, code: 'en', theme: 'dark', level: 'big-picture', mode: 'explain', start: fileId('app.py') })
+  linksHold(en)
+  expect(en).toContain('<html lang="en" data-theme="dark" data-fixed data-level="big-picture" data-start="' + fileId('app.py') + '">')
+  expect(en).toContain('body:not(:has(:target)) #' + fileId('app.py') + ' { display: block; }')
+  for (const word of ['Explain: the code as it stands', 'Commit 1 of 4', '2 older commits in this range are not shown.', 'not in this review', 'Go to file']) expect(en, word).toContain(word)
+  expect(html + en).not.toContain('—')
+  // a start that is not on the page falls back to the overview
+  expect(render(r, x, labels('en'), { ...OPTIONS, start: 'f-nowhere' })).toContain('data-start="overview"')
+})
+
+test('a page over its budget leaves out what it shows twice first, then the longest code, and its links still hold', async () => {
+  const text = Array.from({ length: 600 }, (_, i) => 'v' + i + ' = ' + 'x'.repeat(80)).join('\n')
+  const big = added('big.py', text)
   const src = source({ commits: [...COMMITS, { sha: 'a7a7a7a7', parents: [], author: 'E', time: 1, subject: 'big', body: '', files: [{ patch: big, redactions: 0, hidden: null, cut: false }] }] })
-  const full = bytes(render(build(src), labels('en'), { code: 'en', theme: 'auto', version: '0.1.0' }))
-  const page = fit(build(src), labels('en'), { code: 'en', theme: 'auto', version: '0.1.0' }, full - 1000)
-  expect(page.cut).toBeGreaterThan(0)
-  expect(bytes(page.html)).toBeLessThanOrEqual(full - 1000)
-  expect(page.html).toContain('The code of this file is left out to keep the page small')
+  const states = [...STATES, stateOf('big.py', text, new Array(600).fill('a7a7a7a7'))]
+  const full = bytes(render(build(src), explore(build(src), states as any, INFO), labels('en'), { ...OPTIONS, code: 'en' }))
+  for (const budget of [full - 1000, Math.round(full / 3)]) {
+    const r = build(src)
+    const page = fit(r, explore(r, states as any, INFO), labels('en'), { ...OPTIONS, code: 'en' }, budget)
+    expect(page.cut, String(budget)).toBeGreaterThan(0)
+    expect(bytes(page.html), String(budget)).toBeLessThanOrEqual(budget)
+    linksHold(page.html)
+  }
+  // a budget nothing fits: the oldest commits go too, down to one, and no link is left dangling
+  const tiny = build(src)
+  linksHold(fit(tiny, explore(tiny, states as any, INFO), labels('en'), { ...OPTIONS, code: 'en' }, 1000).html)
+  expect(tiny.groups.length).toBe(1)
+  const r = build(src)
+  const small = fit(r, explore(r, states as any, INFO), labels('en'), { ...OPTIONS, code: 'en' }, Math.round(full / 3)).html
+  expect(small).toContain('The code of this file is left out to keep the page small')
+  expect(small).toContain('See this change in its commit')
 })

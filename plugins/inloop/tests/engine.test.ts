@@ -2,6 +2,7 @@
 // over a project held in memory (world.ts).
 import { expect, test } from 'claude-code/testing'
 import { worldOf, ROOT, SESSION_ID, LOG, START, COMPOSE, command, turnDone, note, type Git } from './world.ts'
+import { fileId } from '../hooks/review/explorer.ts'
 
 const edits = (w: { records: () => any[] }) => w.records().filter((r) => r.kind === 'edit')
 const DESCRIBE = { tool: 'mcp__inloop__note', description: 'Record a note.', provider: { plugin: 'inloop', tier: 'user' } } as any
@@ -334,8 +335,8 @@ test('a commit with none of Claude\'s work, made in a session that recorded noth
 })
 
 test('/inloop review writes the session\'s commits and what is not committed yet, explained beside the code', async ($, on) => {
-  const A = 'a1a1a1a1a1'
-  const B = 'b2b2b2b2b2'
+  const A = 'a1'.repeat(20)
+  const B = 'b2'.repeat(20)
   const SHAPES = 'class Rectangle:\n    def area(self):\n        return self.w * self.h\n'
   const git: Git = { 'git rev-parse --show-toplevel': ROOT + '\n', 'git rev-parse --verify --quiet HEAD': A + '\n', 'git status --porcelain=v1 -z --untracked-files=all': '' }
   const w = worldOf(on, { git })
@@ -359,13 +360,22 @@ test('/inloop review writes the session\'s commits and what is not committed yet
     ['git -c core.quotePath=false show --format= --no-color --no-ext-diff ' + B + ' -W']: 'diff --git a/shapes.py b/shapes.py\nnew file mode 100644\n--- /dev/null\n+++ b/shapes.py\n@@ -0,0 +1,3 @@\n' + SHAPES.trimEnd().split('\n').map((l) => '+' + l).join('\n') + '\n',
     'git -c core.quotePath=false diff --no-color --no-ext-diff HEAD -W': '',
     'git ls-files --others --exclude-standard -z': 'app.py\u0000',
+    // who wrote each line of shapes.py; app.py is not tracked, so git has no blame for it
+    'git blame --porcelain -- shapes.py': SHAPES.trimEnd().split('\n').map((l, i) => B + ' ' + (i + 1) + ' ' + (i + 1) + (i ? '' : ' 3\nsummary feat: add shapes\ncommitter-time 1700000000') + '\n\t' + l).join('\n') + '\n',
   })
   const page = ROOT + '/.inloop/review/review.html'
   expect((await $.command.run(command('review'))).text).toBe('The review is at ' + page)
   const html = w.files.get(page) ?? ''
   for (const word of ['Commit 1 of 1', 'feat: add shapes', 'Not committed yet', 'area is width times height', 'from shapes.py', 'picks the biggest']) expect(html, word).toContain(word)
-  // the class named in the uncommitted file links to where the commit defines it
-  expect(html).toContain('<a class="xref" href="#c-' + B + '-f0-1" title="holds sizes">Rectangle</a>')
+  // the class named in the uncommitted file links to where shapes.py defines it, as the file stands
+  const shapes = fileId('shapes.py')
+  expect(html).toContain('<a class="xref" href="#' + shapes + '_1" title="holds sizes">Rectangle</a>')
+  expect(html).toContain('<section class="view" id="' + shapes + '_why"')
+  expect(html).toContain('<a class="t" href="#c-' + B.slice(0, 12) + '">Shapes</a>')
+  // the explanation of the code as it stands opens on the file it names
+  expect((await $.command.run(command('explain shapes.py'))).text).toBe('The explanation is at ' + ROOT + '/.inloop/review/explain-shapes.py.html')
+  expect(w.files.get(ROOT + '/.inloop/review/explain-shapes.py.html')).toContain('data-start="' + shapes + '"')
+  expect((await $.command.run(command('explain nowhere.py'))).text).toBe('"nowhere.py" is not a file in this project.')
   await $.command.run(command('review --theme dark'))
   expect(w.files.get(ROOT + '/.inloop/review/review-dark.html')).toContain('data-theme="dark" data-fixed')
   expect((await $.command.run(command('review nosuch..'))).text).toBe('git does not know "nosuch..". Try a range such as main.. or HEAD~5.., or a commit hash.')

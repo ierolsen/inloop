@@ -1,11 +1,11 @@
 ---
-name: explain
+name: annotate
 description: Explain code that already exists as inloop notes, so it shows on the review page beside the notes Claude writes while changing code. For older code, a project someone else built, a commit range, or edits the review page lists without a note.
 argument-hint: <file, folder, function, class or commit range>
 disable-model-invocation: true
 ---
 
-# Explain existing code with inloop
+# Annotate existing code with inloop
 
 The user wants to understand this code, which already exists: $ARGUMENTS
 
@@ -67,5 +67,6 @@ Never put secrets, tokens or passwords in a note, even when the code holds them.
 ## Finish
 
 Call `mcp__inloop__recap` once: an overview, the order to read the files in and why, the files
-grouped by role, and what the user should check by hand. Then tell the user that `/inloop review`
-shows the notes beside the code (`/inloop review <range>` for the commits you explained).
+grouped by role, and what the user should check by hand. Then tell the user that
+`/inloop explain <path>` shows the notes beside the code as it stands, and `/inloop review <range>`
+shows them commit by commit for the commits you explained.

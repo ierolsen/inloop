@@ -63,6 +63,11 @@ export { markKey }
 
 // Short names and everyday words are never linked, so code does not turn into a sea of links.
 const NO_LINK = new Set(['main', 'init', 'self', 'data', 'value', 'values', 'result', 'name', 'type', 'list', 'item', 'items', 'test', 'run', 'get', 'set', 'add', 'new', 'path', 'file', 'text', 'args', 'config', 'index', 'model', 'train'])
+// The name other lines link by: the last part of a dotted name, or null when it is too common
+export function linkName(name: string): string | null {
+  const short = name.split(/[.:#]+/).pop() || name
+  return short.length >= 4 && !NO_LINK.has(short.toLowerCase()) ? short : null
+}
 
 export function build(src: Source): Review {
   const notes = new Map<string, NoteRef>()
@@ -162,8 +167,8 @@ export function build(src: Source): Review {
         const fv = g.files.find((f) => f.pins.has(key))
         const href = fv ? '#' + fv.anchor + '-' + fv.pins.get(key) : null
         index.push({ name: s.name, kind: s.kind, file: s.file, why: s.why_exists, href, group: g.id })
-        const short = s.name.split(/[.:#]+/).pop() || s.name
-        if (href && short.length >= 4 && !NO_LINK.has(short.toLowerCase()) && !links.has(short)) links.set(short, { href, title: s.why_exists })
+        const short = linkName(s.name)
+        if (href && short && !links.has(short)) links.set(short, { href, title: s.why_exists })
       })
     }
   }

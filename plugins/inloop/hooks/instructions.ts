@@ -123,7 +123,7 @@ export const NOTE_SPEC = {
       impact: list('Other parts of the system this change affects, depends on or makes harder to change.', { type: 'string' }),
       alternatives: list('Options you rejected, each with the reason.', { type: 'string' }),
       risks: list('What the user should check by hand after this change.', { type: 'string' }),
-      source: { type: 'string', enum: ['live', 'reconstructed'], description: '"reconstructed" when the note explains code that already exists (as /inloop:explain asks) rather than a change you are about to make. Leave it out otherwise.' },
+      source: { type: 'string', enum: ['live', 'reconstructed'], description: '"reconstructed" when the note explains code that already exists (as /inloop:annotate asks) rather than a change you are about to make. Leave it out otherwise.' },
       commit: text('Only for a reconstructed note that explains one commit: that commit\'s hash.'),
     },
     required: ['title', 'files', 'what', 'why'],

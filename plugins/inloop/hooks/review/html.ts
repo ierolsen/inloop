@@ -58,9 +58,10 @@ export type Theme = 'auto' | 'light' | 'dark'
 
 // The page around a body: no network (the policy allows inline style and script only), the theme
 // chosen before the first paint so a dark page never flashes light, and a print button.
-export function shell(title: string, code: string | null, theme: Theme, css: string, body: string, script: string): string {
+export function shell(title: string, code: string | null, theme: Theme, css: string, body: string, script: string, attrs: Record<string, string> = {}): string {
   const fixed = theme === 'auto' ? '' : ' data-theme="' + theme + '" data-fixed'
-  return '<!doctype html>\n<html lang="' + esc(code ?? 'en') + '"' + fixed + '>\n<head>\n<meta charset="utf-8">\n' +
+  const more = Object.entries(attrs).map(([k, v]) => ' ' + k + '="' + esc(v) + '"').join('')
+  return '<!doctype html>\n<html lang="' + esc(code ?? 'en') + '"' + fixed + more + '>\n<head>\n<meta charset="utf-8">\n' +
     '<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
     '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; script-src \'unsafe-inline\'; img-src data:; base-uri \'none\'; form-action \'none\'">\n' +
     '<meta name="generator" content="inloop">\n<title>' + esc(title) + '</title>\n' +

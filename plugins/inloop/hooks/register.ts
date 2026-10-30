@@ -10,8 +10,9 @@ import { SCHEMA, DIR, LOG_DIR, REVIEW_DIR, CONFIG, PART_BYTES, line, parse, part
 import { nul, porcelain, unaccounted, state, hunks, counts, inloopOwn, OUTSIDE_MAX } from './outside.ts'
 import { labels, hasLabels, say, count, nameOf, shownIn } from './i18n/index.ts'
 import type { Labels } from './i18n/en.ts'
-import { build as buildReview, type GitCommit, type FileData } from './review/review.ts'
-import { fit as fitReview } from './review/page.ts'
+import { build as buildReview, type GitCommit, type FileData, type Review } from './review/review.ts'
+import { fit as fitReview, type Mode } from './review/page.ts'
+import { explore, parseBlame, covers, fileId, dirId, UNCOMMITTED, type FileState, type BlameInfo } from './review/explorer.ts'
 import { parsePatch, added, clip, lineCount } from './review/patch.ts'
 import type { Theme } from './review/html.ts'
 import { noteCard, recapCard } from './live/card.ts'
@@ -25,6 +26,8 @@ const REVIEW_COMMITS = 30 // commits on one review page; older ones in the range
 const FILE_LINES = 400 // a file's diff past this many lines is fetched again with less context
 const UNTRACKED_MAX = 30 // files not in git yet that a review reads
 const COMMITS_MAX = 50 // commits recorded from one move of HEAD
+const EXPLORE_FILES = 40 // files a page shows the code of, with who wrote each line
+const EXPLORE_LINES = 2000 // a longer file is shown by its changes only
 const NOTHING_OUTSIDE = '[[],0]' // fingerprint() of an empty list: where every baseline starts
 
 type Snapshot = { text: string; exists: boolean; skipped: Skipped | null }
@@ -530,22 +533,91 @@ async function show($: any, path: string): Promise<boolean> {
   }
 }
 
-// Writes the review and opens it: this session's work by default, every commit inloop recorded
-// with "all", or a git range or commit.
-async function review($: any, what: string, theme: Theme, l: Labels): Promise<string> {
+// The commit a range ends at, in git's terms: the first commit it names that is not excluded
+// ("^"). Null when git names none.
+async function endOf($: any, what: string): Promise<string | null> {
+  const r = await gitRun($, ['git', 'rev-parse', '--revs-only', what])
+  if (!r.ok) return null
+  return r.out.split('\n').map((x) => x.trim()).find((x) => /^[0-9a-f]{7,64}$/.test(x)) ?? null
+}
+
+// The files a page covers, as they stand at its end (a commit, or the working folder when `end` is
+// null), with the commit that last changed each line. The files with explanations come first when
+// there are more than a page shows the code of.
+async function fileStates($: any, model: Review, end: string | null, extra: string[]): Promise<{ states: FileState[]; info: Map<string, BlameInfo> }> {
+  const groups = [...model.groups, ...(model.explained ? [model.explained] : [])]
+  const paths: string[] = []
+  const add = (p: string) => { if (p && !paths.includes(p) && !inloopOwn(p)) paths.push(p) }
+  for (const g of groups) for (const f of g.files) add(f.data.patch.path)
+  extra.forEach(add)
+  const noted = (p: string) => groups.some((g) => g.notes.some((r) => covers(r, p)))
+  const keep = new Set([...paths].sort((a, b) => Number(noted(b)) - Number(noted(a))).slice(0, EXPLORE_FILES))
+  const info = new Map<string, BlameInfo>()
+  const states: FileState[] = []
+  for (const path of paths) {
+    const state: FileState = { path, text: null, hidden: null, blame: null }
+    states.push(state)
+    if (sensitive(path)) { state.hidden = 'sensitive'; continue }
+    if (!keep.has(path)) { state.hidden = 'too-large'; continue }
+    let text: string | null = null
+    if (end) {
+      const sized = await gitRun($, ['git', 'cat-file', '-s', end + ':' + path])
+      const size = Number(sized.out.trim())
+      if (!sized.ok || !Number.isFinite(size)) state.hidden = 'deleted'
+      else if (size > READ_MAX) state.hidden = 'too-large'
+      else {
+        const shown = await gitRun($, ['git', 'show', end + ':' + path])
+        if (!shown.ok) state.hidden = 'deleted'
+        else if (isBinary(shown.out)) state.hidden = 'binary'
+        else if (bytes(shown.out) !== size) state.hidden = 'too-large' // cut short on the way
+        else text = shown.out
+      }
+    } else {
+      const snap = await snapshot($, root + '/' + path)
+      if (!snap.exists) state.hidden = 'deleted'
+      else if (snap.skipped === 'binary') state.hidden = 'binary'
+      else if (snap.skipped) state.hidden = 'too-large'
+      else text = snap.text
+    }
+    if (text === null) continue
+    const total = text.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n').length
+    if (total > EXPLORE_LINES) { state.hidden = 'too-large'; continue }
+    state.text = redact(text).text
+    if (!git) continue
+    const blamed = await gitRun($, ['git', 'blame', '--porcelain', ...(end ? [end] : []), '--', path])
+    if (blamed.ok) {
+      const parsed = parseBlame(blamed.out)
+      parsed.info.forEach((v, k) => info.set(k, v))
+      // a blame that does not cover every line (cut short, or the text changed) is not used
+      if (parsed.lines.length === total && [...parsed.lines].every(Boolean)) state.blame = parsed.lines
+    } else if (!end) {
+      // a file git does not track yet: every line is not committed
+      state.blame = new Array(total).fill(UNCOMMITTED)
+    }
+  }
+  return { states, info }
+}
+
+type Page = { what: string; theme: Theme; mode: Mode; extra: string[]; start: string | null; name: string }
+
+// Writes an explorer page and opens it. A review covers this session's work by default, every
+// commit inloop recorded with "all", or a git range or commit; an explanation covers every commit
+// inloop recorded and the files as they stand.
+async function writePage($: any, page: Page, l: Labels): Promise<string> {
   await writing
   try {
     await checkHead($)
     await checkOutside($)
   } catch {
-    // the review shows what git shows
+    // the page shows what git shows
   }
   const all = await readAll($)
+  const what = page.what
   const scope: 'session' | 'range' | 'all' = what === 'all' ? 'all' : what ? 'range' : 'session'
-  if (scope === 'range' && !/^[\w./~^@{}:+-]+$/.test(what)) return say(l.review_bad_range, { range: what })
-  if (scope === 'range' && what.startsWith('-')) return say(l.review_bad_range, { range: what })
+  if (scope === 'range' && (!/^[\w./~^@{}:+-]+$/.test(what) || what.startsWith('-'))) return say(l.review_bad_range, { range: what })
   let found: { commits: GitCommit[]; more: number } = { commits: [], more: 0 }
   let pending: FileData[] | null = null
+  let end: string | null = null
   if (git) {
     if (scope === 'all') found = await recordedCommits($, all)
     else {
@@ -556,18 +628,53 @@ async function review($: any, what: string, theme: Theme, l: Labels): Promise<st
       if (got) found = got
     }
     if (scope !== 'range') pending = await pendingFiles($)
+    else end = await endOf($, what)
   }
   const code = shownIn(settings.language.code)
   const model = buildReview({
     records: all, commits: found.commits, more: found.more, pending, explained: await explainedFiles($, all), git, scope,
     range: scope === 'range' ? what : null, project: root.split('/').pop() || root,
   })
-  const { html, cut } = fitReview(model, labels(code), { code, theme, version: VERSION })
-  const name = scope === 'session' ? 'review' : scope === 'all' ? 'review-all' : 'review-' + what.replace(/[^\w.-]+/g, '_').slice(0, 60)
-  const path = root + '/' + REVIEW_DIR + '/' + name + (theme === 'auto' ? '' : '-' + theme) + '.html'
+  const { states, info } = await fileStates($, model, end, page.extra)
+  const explorer = explore(model, states, info)
+  const { html, cut } = fitReview(model, explorer, labels(code), { code, theme: page.theme, version: VERSION, level: settings.level.value, mode: page.mode, start: page.start })
+  const path = root + '/' + REVIEW_DIR + '/' + page.name + (page.theme === 'auto' ? '' : '-' + page.theme) + '.html'
   await keepOutOfGit($)
   await $.fs.write(path, html)
-  return say((await show($, path)) ? l.review_opened : l.review_written, { path }) + (cut ? '\n' + l.review_trimmed : '')
+  const opened = await show($, path)
+  const said = page.mode === 'explain' ? (opened ? l.explain_opened : l.explain_written) : opened ? l.review_opened : l.review_written
+  return say(said, { path }) + (cut ? '\n' + l.review_trimmed : '')
+}
+
+async function review($: any, what: string, theme: Theme, l: Labels): Promise<string> {
+  const name = !what ? 'review' : what === 'all' ? 'review-all' : 'review-' + what.replace(/[^\w.-]+/g, '_').slice(0, 60)
+  return writePage($, { what, theme, mode: 'review', extra: [], start: null, name }, l)
+}
+
+// The code as it stands with every explanation inloop has, opened on one file or folder when one
+// is named
+async function explain($: any, target: string, theme: Theme, l: Labels): Promise<string> {
+  let rel = target ? relative(target, root).replace(/^\.\//, '').replace(/\/+$/, '') : ''
+  const extra: string[] = []
+  let opening: string | null = null
+  if (rel) {
+    let kind = ''
+    try {
+      kind = inside(root + '/' + rel, root) && !inloopOwn(rel) ? (await $.fs.stat(root + '/' + rel)).kind : ''
+    } catch {
+      kind = ''
+    }
+    if (kind === 'file') {
+      extra.push(rel)
+      opening = fileId(rel)
+    } else if (kind === 'dir' || kind === 'directory') {
+      const listed = git ? nul((await gitRun($, ['git', 'ls-files', '-z', '--', rel])).out) : []
+      extra.push(...listed.filter((p) => !inloopOwn(p)).slice(0, EXPLORE_FILES))
+      opening = dirId(rel)
+    } else return say(l.explain_missing, { path: target })
+  }
+  const name = 'explain' + (rel ? '-' + rel.replace(/[^\w.-]+/g, '_').slice(0, 60) : '')
+  return writePage($, { what: 'all', theme, mode: 'explain', extra, start: opening ?? 'd-root', name }, l)
 }
 
 function statusText(): string {
@@ -596,8 +703,8 @@ export function register(on: any, pluginOptions: any) {
       await $.tool.register(RECAP_SPEC)
       await $.command.register({
         name: PLUGIN,
-        description: 'inloop: the review of Claude\'s work, the language and form of notes, on and off',
-        argumentHint: '[review [range | all] [--theme light|dark] | status | lang <language> | level <level> | adhd on|off | on | off | help]',
+        description: 'inloop: review Claude\'s work, explain the code as it stands, the language and level of notes, on and off',
+        argumentHint: '[review [range | all] | explain [path] | status | lang <language> | level <level> | adhd on|off | on | off | help] [--theme light|dark]',
         immediate: true,
       })
     } catch (err) {
@@ -737,13 +844,13 @@ export function register(on: any, pluginOptions: any) {
     const [command = 'status', ...rest] = words.filter((w) => w !== '--project')
     const value = rest.join(' ')
     if (command === 'help') return { text: l.help }
-    if (command === 'review') {
+    if (command === 'review' || command === 'explain') {
       const at = rest.indexOf('--theme')
       const wanted = at >= 0 ? rest[at + 1] : ''
       const theme: Theme = wanted === 'light' || wanted === 'dark' ? wanted : 'auto'
-      const target = rest.filter((_, i) => at < 0 || (i !== at && i !== at + 1))[0] ?? ''
+      const args = rest.filter((_, i) => at < 0 || (i !== at && i !== at + 1))
       try {
-        return { text: await review($, target, theme, l) }
+        return { text: command === 'review' ? await review($, args[0] ?? '', theme, l) : await explain($, args.join(' '), theme, l) }
       } catch (err) {
         return { text: say(l.review_failed, { error: String(err) }) }
       }
