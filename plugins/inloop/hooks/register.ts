@@ -703,7 +703,7 @@ async function review($: any, what: string, theme: Theme, l: Labels): Promise<st
 }
 
 // The code as it stands with every explanation inloop has, opened on one file or folder when one
-// is named
+// is named, else on the overview, where an onboarding guide is
 async function explain($: any, target: string, theme: Theme, l: Labels): Promise<string> {
   const rel = target ? relative(target, root).replace(/^\.\//, '').replace(/\/+$/, '') : ''
   const extra: string[] = []
@@ -728,7 +728,7 @@ async function explain($: any, target: string, theme: Theme, l: Labels): Promise
   const s = await scopeOf($, 'all', all, l)
   if (typeof s === 'string') return s
   const model = modelOf(s, all, await explainedFiles($, all))
-  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'explain', extra, start: opening ?? 'd-root', command: ('/inloop explain ' + rel).trim() })
+  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'explain', extra, start: opening ?? 'overview', command: ('/inloop explain ' + rel).trim() })
   return writeAndShow($, 'explain' + (rel ? '-' + rel.replace(/[^\w.-]+/g, '_').slice(0, 60) : ''), theme, html, cut, true, l)
 }
 

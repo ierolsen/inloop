@@ -376,6 +376,9 @@ test('/inloop review writes the session\'s commits and what is not committed yet
   expect((await $.command.run(command('explain shapes.py'))).text).toBe('The explanation is at ' + ROOT + '/.inloop/review/explain-shapes.py.html')
   expect(w.files.get(ROOT + '/.inloop/review/explain-shapes.py.html')).toContain('data-start="' + shapes + '"')
   expect((await $.command.run(command('explain nowhere.py'))).text).toBe('"nowhere.py" is not a file in this project.')
+  // with no path it opens on the overview, where an onboarding guide is
+  await $.command.run(command('explain'))
+  expect(w.files.get(ROOT + '/.inloop/review/explain.html')).toContain('data-start="overview"')
   await $.command.run(command('review --theme dark'))
   expect(w.files.get(ROOT + '/.inloop/review/review-dark.html')).toContain('data-theme="dark" data-fixed')
   expect((await $.command.run(command('review nosuch..'))).text).toBe('git does not know "nosuch..". Try a range such as main.. or HEAD~5.., or a commit hash.')
