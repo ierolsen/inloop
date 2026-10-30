@@ -5,25 +5,37 @@ Stay in the loop with the code your agent writes.
 inloop is a Claude Code plugin. Before each change, Claude explains it in a short, structured
 note: the point in one line, what the change does, why, why each new class or function exists,
 what it brings in from other files or libraries, and the parameters that matter. You read the
-notes live while Claude works, and afterwards as a review of your commits with every explanation
-next to the line of code it explains. In your language, and in an ADHD-friendly form if you want.
+notes live while Claude works, and afterwards in your browser, browsing the code like a repository
+with every explanation next to the line it explains. In your language, at the level of detail you
+want, and in an ADHD-friendly form if you want.
 
-![A review: each commit's code with the explanations beside it](docs/review.png)
+![The review: a file's code with its explanations beside it, the project's files on the side](docs/review.png)
 
 ## What you get
 
 - **Notes while Claude works.** Each note appears in the transcript as a card, right above the
   edit it explains.
-- **A review, commit by commit.** `/inloop review` opens a page in your browser: the commits of
-  this session, then what is not committed yet. For each commit, the reason first, then each
-  file's code with numbered explanations beside the lines they are about.
+- **A review you browse like a repository.** `/inloop review` opens a page in your browser: the
+  files of this session's work in a tree, as on GitHub. Each file has three tabs: **Code**, the
+  file as it stands with numbered explanations beside the lines they are about; **Changes**, its
+  diff in each commit; and **Why**, every block of lines with the commit that last changed it and
+  the note that explains that commit. Each commit has its own page too, with its reason first.
 - **Line by line.** Comments on the lines a reader would stop at, the class and function cards at
   the line that defines them, and what was imported from elsewhere at the import, with links
   between files.
 - **Any commits, any time.** `/inloop review main..` for a branch, `/inloop review HEAD~10..` for
   the last ten commits, `/inloop review a1b2c3d` for one.
-- **Code you did not watch being written.** `/inloop:explain` explains existing code, a folder, or
-  a range of commits after the fact, in the same format, marked as explained afterwards.
+- **The code as it stands.** `/inloop explain src/app.py` opens the same page on one file or
+  folder, with every explanation inloop has for it.
+- **Code you did not watch being written.** `/inloop:annotate` asks Claude to explain existing
+  code, a folder, or a range of commits after the fact, in the same format, marked as explained
+  afterwards.
+- **Five levels of detail.** From `full` (nearly every line explained, every term defined) through
+  `guided`, `essentials` and `design` to `big-picture` (architecture and consequences only). The
+  page can switch to a higher level to hide detail.
+- **Technical terms stay technical.** A note in Turkish or German says "train/test split" and
+  "random seed" as developers there do, and explains them, instead of translating them word by
+  word.
 - **In your language.** Notes are written in the language you choose, whatever language you chat
   in. inloop's own labels are in English, Turkish, German and Dutch.
 - **ADHD-friendly, on request.** `/inloop adhd on`: the point first, short lines, bold key words,
@@ -55,16 +67,20 @@ To try it in one session without installing, clone this repository and run
 |---|---|
 | `/inloop review` | The review of this session: its commits, then what is not committed yet |
 | `/inloop review <range>` | Any commits: `main..`, `HEAD~5..`, `a1b2c3d`; `all` for every commit inloop recorded |
+| `/inloop explain [path]` | The code as it stands, opened on a file or folder, with every explanation inloop has |
 | `/inloop review ... --theme light` | The page with a fixed theme, to share or print (`dark` also works) |
-| `/inloop:explain <target>` | Claude explains existing code: a file, a folder, a function, a commit range |
+| `/inloop:annotate <target>` | Claude explains existing code: a file, a folder, a function, a commit range |
 | `/inloop lang <language>` | The language of the notes, for all your projects (`--project` for this one) |
-| `/inloop detail <level>` | `brief`, `standard` or `deep`: how much the notes explain |
+| `/inloop level <level>` | How the notes explain: `full`, `guided`, `essentials`, `design` or `big-picture` |
 | `/inloop adhd on` | The ADHD-friendly form; `off` to go back |
 | `/inloop on`, `/inloop off` | Ask Claude for notes in this session, or stop |
 | `/inloop status` | What was recorded, and which settings are in effect |
 
-The language, the detail level and the ADHD form can also be set in `/config`. A project's own
-choice comes first, then yours across projects, then the plugin setting.
+The language, the level and the ADHD form can also be set in `/config`. A project's own choice
+comes first, then yours across projects, then the plugin setting.
+
+On the page, `t` jumps to "Go to file", the level switch hides detail, and "Everything as PDF"
+prints every commit (or, for `/inloop explain`, every file) in one go.
 
 ## How it works
 
@@ -80,8 +96,8 @@ that changes nothing writes nothing.
 ## Privacy
 
 inloop makes no network requests and no model calls of its own. The notes are written by Claude
-in your session, so they cost output tokens; `/inloop detail brief` or `/inloop off` keep that
-down. Secrets are redacted before anything is written, and files that usually hold secrets, such
+in your session, so they cost output tokens; `/inloop level essentials` or `/inloop off` keep
+that down. Secrets are redacted before anything is written, and files that usually hold secrets, such
 as `.env` files and keys, are recorded by name only. The review page is a single file that loads
 nothing from the internet. See [docs/privacy.md](docs/privacy.md).
 
@@ -91,8 +107,9 @@ nothing from the internet. See [docs/privacy.md](docs/privacy.md).
   hooks; other Claude apps load skills only. Organizations can turn plugin mods off.
 - Notes depend on Claude following inloop's instructions. Edits made without a note are marked as
   such, and files changed by shell commands are caught through git.
-- A review shows up to 30 commits and counts the rest. A page over 3.8 MB leaves out the code of
-  its longest files and says so.
+- A review shows up to 30 commits and counts the rest. A page shows the code of up to 40 files,
+  of up to 2,000 lines each. A page over 3.8 MB leaves out what it shows twice first, then the
+  code of its longest files, and says so.
 
 ## Development
 

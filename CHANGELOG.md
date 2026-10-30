@@ -10,9 +10,16 @@ The first version.
 - A recap when a task is done: overview, reading order, files by role, what to check by hand.
 - Capture of every edit with its diff, of commits made during the session, and of files changed
   outside the edit tools.
-- `/inloop review`: the session's commits and what is not committed yet, or any git range, with
-  every explanation numbered beside its line; light, dark and automatic themes; print to PDF.
-- `/inloop:explain`: explanations of existing code and of past commits.
+- `/inloop review`: the session's commits and what is not committed yet, or any git range,
+  browsed like a repository: a file tree with "Go to file", folder views, and for each file its
+  code with every explanation numbered beside its line, its changes commit by commit, and why
+  each block of lines is there (git blame with the notes); light, dark and automatic themes;
+  the open view or everything as PDF.
+- `/inloop explain [path]`: the same page on the code as it stands, opened on a file or folder.
+- `/inloop:annotate`: explanations of existing code and of past commits.
+- Five levels of explanation (`/inloop level`), from `full` to `big-picture`; the page can hide
+  detail down to the big picture.
+- Technical terms kept as developers say them in every language, with a glossary in each note.
 - Notes in any language; inloop's own labels in English, Turkish, German and Dutch.
 - `/inloop adhd`: an ADHD-friendly form for the notes.
 - Secrets redacted before anything is written; nothing leaves the computer.

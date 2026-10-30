@@ -17,6 +17,18 @@ sessions and tasks, with the code folded away. These changes followed:
 - **The pane is dropped:** the cards and Claude Code's own edit rows cover watching live, and the
   review covers reading calmly.
 
+The second look (30 Oct) found technical terms translated word for word, and one long page too
+hard to find things in. These changes followed:
+
+- **Terms stay as developers say them**, explained in a glossary (`terms`) instead of translated.
+- **Five levels** replace the detail setting: `full`, `guided`, `essentials`, `design`,
+  `big-picture` (`/inloop level`), with an `impact` field for the design and architecture levels.
+- **The page is a file explorer**: a tree, folder views, and Code / Changes / Why for each file.
+- **`/inloop explain [path]`** opens it on the code as it stands; the skill that writes
+  explanations of existing code is now `/inloop:annotate`.
+- Next: sharing (`/inloop share` as a file and as a pull request comment), `/inloop review pr`,
+  and in December a share link through a secret gist.
+
 The sections below are the plan as it was approved on 29 Oct.
 
 ## Why
