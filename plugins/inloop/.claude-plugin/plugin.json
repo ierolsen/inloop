@@ -9,6 +9,9 @@
   },
   "homepage": "https://github.com/ierolsen/inloop",
   "repository": "https://github.com/ierolsen/inloop",
+  "documentationUrl": "https://github.com/ierolsen/inloop#readme",
+  "supportUrl": "https://github.com/ierolsen/inloop/issues",
+  "privacyPolicyUrl": "https://github.com/ierolsen/inloop/blob/main/docs/privacy.md",
   "license": "MIT",
   "keywords": [
     "code review",
