@@ -152,8 +152,12 @@ test('secrets are redacted and secret files are named only', async () => {
 })
 
 test('a log reads back its records and skips broken or foreign lines', async () => {
-  const rec = { v: 1, kind: 'note', ts: 1, session: 's', agent: null, turn: null, id: 'n', n: 1, source: 'live', note: {}, problems: [] } as any
+  const rec = { v: 1, kind: 'note', ts: 1, session: 's', agent: null, turn: null, id: 'n', n: 1, source: 'live', note: cleanNote({ title: 't', files: ['a.py'] }).note, problems: [] } as any
   expect(parse(line(rec) + '{"v":2,"kind":"note"}\nnot json\n\n' + line(rec))).toEqual([rec, rec])
+  // a note an earlier inloop wrote, before `terms`, `impact` and `removed` existed, reads back with them empty
+  const { terms, impact, removed, ...old } = rec.note
+  const back = parse(line({ ...rec, note: old }))[0] as any
+  expect([back.note.terms, back.note.impact, back.note.removed, back.note.title]).toEqual([[], [], [], 't'])
   expect(partPath('/r', 'abc', 1)).toBe('/r/.inloop/log/abc.jsonl')
   expect(partPath('/r', 'abc', 3)).toBe('/r/.inloop/log/abc.3.jsonl')
   expect([...sessionsOf(['b.jsonl', 'a.2.jsonl', 'a.jsonl', 'notes.txt'])]).toEqual([['a', ['a.jsonl', 'a.2.jsonl']], ['b', ['b.jsonl']]])

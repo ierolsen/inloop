@@ -2,7 +2,7 @@
 // Every record carries `v`, the schema version, so later versions can read older logs.
 // Plain module: no mods API calls here.
 
-import type { Note, Recap } from './note.ts'
+import { cleanNote, type Note, type Recap } from './note.ts'
 
 export const SCHEMA = 1
 export const DIR = '.inloop'
@@ -52,13 +52,16 @@ export function line(record: LogRecord): string {
 }
 
 // Records of a log file; lines that are not JSON, or from another schema version, are left out.
+// A note written by an earlier inloop lacks the fields added since: it gets them, empty.
 export function parse(text: string): LogRecord[] {
   const out: LogRecord[] = []
   for (const raw of text.split('\n')) {
     if (!raw.trim()) continue
     try {
       const r = JSON.parse(raw)
-      if (r && r.v === SCHEMA && typeof r.kind === 'string') out.push(r)
+      if (!r || r.v !== SCHEMA || typeof r.kind !== 'string') continue
+      if (r.kind === 'note') r.note = cleanNote(r.note && typeof r.note === 'object' ? r.note : {}).note
+      out.push(r)
     } catch {
       // a line cut by a crash; the rest of the file still counts
     }
