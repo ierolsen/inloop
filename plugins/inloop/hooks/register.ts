@@ -16,7 +16,8 @@ import { explore, parseBlame, covers, fileId, dirId, UNCOMMITTED, type FileState
 import { markdown, MARKER, COMMENT_MAX } from './review/markdown.ts'
 import { parsePatch, added, clip, lineCount } from './review/patch.ts'
 import type { Theme } from './review/html.ts'
-import { noteCard, recapCard } from './live/card.ts'
+import { noteCard, recapCard, sentBackRow } from './live/card.ts'
+import { literals, sendBack } from './jargon.ts'
 
 const PLUGIN = 'inloop'
 const VERSION = '0.1.0'
@@ -30,6 +31,7 @@ const COMMITS_MAX = 50 // commits recorded from one move of HEAD
 const EXPLORE_FILES = 40 // files a page shows the code of, with who wrote each line
 const EXPLORE_LINES = 2000 // a longer file is shown by its changes only
 const SHARE_MD_MAX = 1_000_000 // characters of the Markdown beside a shared page
+const SEND_BACKS = 3 // notes sent back for their wording in one turn, at most
 const NOTHING_OUTSIDE = '[[],0]' // fingerprint() of an empty list: where every baseline starts
 
 type Snapshot = { text: string; exists: boolean; skipped: Skipped | null }
@@ -64,6 +66,8 @@ let lastOutside = NOTHING_OUTSIDE
 let tally = { notes: 0, edits: 0, unexplained: 0, outside: 0 }
 let turnTally = { notes: 0, edits: 0, unexplained: 0 }
 let numbers = new Map<string, number>() // a note's tool_use_id to its number, for its card
+let sentBack = new Map<string, string[]>() // notes sent back for their wording: tool_use_id to the words
+let resent = new Set<string>() // the agents and files of notes sent back this turn: the next try is saved
 
 function reset() {
   ready = false
@@ -93,6 +97,8 @@ function reset() {
   tally = { notes: 0, edits: 0, unexplained: 0, outside: 0 }
   turnTally = { notes: 0, edits: 0, unexplained: 0 }
   numbers = new Map()
+  sentBack = new Map()
+  resent = new Set()
 }
 
 const agentOf = (e: any): string | null => (typeof e.agentId === 'string' && e.agentId ? e.agentId : null)
@@ -633,7 +639,7 @@ async function fresh($: any): Promise<LogRecord[]> {
 
 // What a page covers: the commits, what is not committed, and the commit the files stand at (null
 // for the working folder)
-type Scope = { scope: 'session' | 'range' | 'all'; range: string | null; found: { commits: GitCommit[]; more: number }; pending: FileData[] | null; end: string | null }
+type Scope = { scope: 'session' | 'range' | 'all'; range: string | null; found: { commits: GitCommit[]; more: number }; pending: FileData[] | null; end: string | null; pr?: { number: number; title: string } }
 
 // This session's work by default, every commit inloop recorded with "all", or a git range or
 // commit. A message instead when git does not know the range.
@@ -658,17 +664,21 @@ async function scopeOf($: any, what: string, all: LogRecord[], l: Labels): Promi
 const project = () => root.split('/').pop() || root
 
 function modelOf(s: Scope, all: LogRecord[], explained: { path: string; text: string }[]): Review {
-  return buildReview({ records: all, commits: s.found.commits, more: s.found.more, pending: s.pending, explained, git, scope: s.scope, range: s.range, project: project() })
+  return buildReview({ records: all, commits: s.found.commits, more: s.found.more, pending: s.pending, explained, git, scope: s.scope, range: s.range, pr: s.pr ?? null, project: project() })
 }
 
-type Page = { theme: Theme; mode: Mode; extra: string[]; start: string | null }
+// command: the command as the person would type it again, for the page's footer
+type Page = { theme: Theme; mode: Mode; extra: string[]; start: string | null; command: string }
 
 // The explorer page of a model, within the size a mod may write
 async function pageOf($: any, model: Review, end: string | null, page: Page): Promise<{ html: string; cut: number }> {
   const code = shownIn(settings.language.code)
   const { states, info } = await fileStates($, model, end, page.extra)
   const explorer = explore(model, states, info)
-  return fitReview(model, explorer, labels(code), { code, theme: page.theme, version: VERSION, level: model.written ?? settings.level.value, written: !!model.written, mode: page.mode, start: page.start })
+  return fitReview(model, explorer, labels(code), {
+    code, theme: page.theme, version: VERSION, level: model.written ?? settings.level.value, written: !!model.written, mode: page.mode, start: page.start,
+    command: page.command, made: now(),
+  })
 }
 
 // Writes a page under .inloop/review and opens it
@@ -688,7 +698,7 @@ async function review($: any, what: string, theme: Theme, l: Labels): Promise<st
   const s = await scopeOf($, what, all, l)
   if (typeof s === 'string') return s
   const model = modelOf(s, all, await explainedFiles($, all))
-  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'review', extra: [], start: null })
+  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'review', extra: [], start: null, command: ('/inloop review ' + what).trim() })
   return writeAndShow($, nameOfRange(what), theme, html, cut, false, l)
 }
 
@@ -718,7 +728,7 @@ async function explain($: any, target: string, theme: Theme, l: Labels): Promise
   const s = await scopeOf($, 'all', all, l)
   if (typeof s === 'string') return s
   const model = modelOf(s, all, await explainedFiles($, all))
-  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'explain', extra, start: opening ?? 'd-root' })
+  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'explain', extra, start: opening ?? 'd-root', command: ('/inloop explain ' + rel).trim() })
   return writeAndShow($, 'explain' + (rel ? '-' + rel.replace(/[^\w.-]+/g, '_').slice(0, 60) : ''), theme, html, cut, true, l)
 }
 
@@ -794,8 +804,9 @@ async function share($: any, what: string, theme: Theme, l: Labels): Promise<str
   if (typeof s === 'string') return s
   const model = modelOf(s, all, await explainedFiles($, all))
   const code = shownIn(settings.language.code)
-  const text = markdown(model, labels(code), { code, level: model.written ?? settings.level.value, version: VERSION, marker: false, max: SHARE_MD_MAX }).text
-  const { html, cut } = await pageOf($, model, s.end, { theme: theme === 'auto' ? 'light' : theme, mode: 'review', extra: [], start: null })
+  const command = ('/inloop share ' + what).trim()
+  const text = markdown(model, labels(code), { code, level: model.written ?? settings.level.value, version: VERSION, marker: false, max: SHARE_MD_MAX, command, made: now() }).text
+  const { html, cut } = await pageOf($, model, s.end, { theme: theme === 'auto' ? 'light' : theme, mode: 'review', extra: [], start: null, command })
   const name = 'inloop-' + project().replace(/[^\w.-]+/g, '_').slice(0, 40) + (what ? '-' + nameOfRange(what).replace(/^review-?/, '') : '')
   const page = shareFile(name + '.html')
   const md = shareFile(name + '.md')
@@ -811,10 +822,10 @@ async function share($: any, what: string, theme: Theme, l: Labels): Promise<str
 async function preview($: any, pr: Pr, l: Labels): Promise<string> {
   const all = await fresh($)
   const got = await commitsByOid($, pr.commits)
-  const s: Scope = { scope: 'range', range: say(l.x_pr_range, { number: pr.number }), found: got, pending: null, end: pr.head }
+  const s: Scope = { scope: 'range', range: 'pr-' + pr.number, found: got, pending: null, end: pr.head, pr: { number: pr.number, title: pr.title } }
   const model = modelOf(s, all, [])
   const code = shownIn(settings.language.code)
-  const { text, cut } = markdown(model, labels(code), { code, level: model.written ?? settings.level.value, version: VERSION, marker: true, max: COMMENT_MAX })
+  const { text, cut } = markdown(model, labels(code), { code, level: model.written ?? settings.level.value, version: VERSION, marker: true, max: COMMENT_MAX, command: '/inloop review pr ' + pr.number, made: now() })
   const comment = await ownComment($, pr)
   const md = shareFile('pr-' + pr.number + '.md')
   await keepOutOfGit($)
@@ -893,9 +904,9 @@ async function reviewPr($: any, which: string, theme: Theme, l: Labels): Promise
   if (!fetched.ok) return say(l.review_pr_fetch_failed, { number: pr.number, error: firstLine(fetched.err) })
   const all = await fresh($)
   const got = await commitsByOid($, pr.commits)
-  const s: Scope = { scope: 'range', range: say(l.x_pr_range, { number: pr.number }) + (pr.title ? ': ' + pr.title : ''), found: got, pending: null, end: ref }
+  const s: Scope = { scope: 'range', range: 'pr-' + pr.number, found: got, pending: null, end: ref, pr: { number: pr.number, title: pr.title } }
   const model = modelOf(s, all, [])
-  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'review', extra: [], start: null })
+  const { html, cut } = await pageOf($, model, s.end, { theme, mode: 'review', extra: [], start: null, command: '/inloop review pr ' + pr.number })
   return writeAndShow($, 'review-pr-' + pr.number, theme, html, cut, false, l)
 }
 
@@ -958,6 +969,7 @@ export function register(on: any, pluginOptions: any) {
       turn = typeof e.turnId === 'string' ? e.turnId : null
       pairing.newTurn()
       turnTally = { notes: 0, edits: 0, unexplained: 0 }
+      resent = new Set()
     }
     return next(e)
   })
@@ -965,6 +977,16 @@ export function register(on: any, pluginOptions: any) {
   // The note is answered here, never passed on, so it needs no permission and runs nothing.
   on('tool.call', { tool: 'mcp__inloop__note' }, async ($: any, e: any) => {
     const { note, problems } = cleanNote(e)
+    // a note written with word-for-word translations of technical terms goes back once to be
+    // reworded; the next try for the same files is saved whatever it says
+    const words = literals(note, settings.language.code)
+    const who = (agentOf(e) ?? 'main') + '|' + [...note.files].sort().join(',')
+    if (words.length && !resent.has(who) && resent.size < SEND_BACKS) {
+      resent.add(who)
+      sentBack.set(String(e.tool_use_id ?? ''), words.map((w) => w.said))
+      return { result: sendBack(words, languageName(settings.language), 'mcp__' + PLUGIN + '__note') }
+    }
+    if (words.length) problems.push('technical words written as translations: ' + words.map((w) => w.said + ' -> ' + w.use).join(', '))
     const clean = redactDeep(note).value
     tally.notes += 1
     turnTally.notes += 1
@@ -1003,6 +1025,8 @@ export function register(on: any, pluginOptions: any) {
     const l = labels(settings.language.code)
     const input = e.props.input && typeof e.props.input === 'object' ? e.props.input : {}
     if (e.props.tool === 'mcp__inloop__recap') return recapCard(t, redactDeep(cleanRecap(input).recap).value, l)
+    const back = sentBack.get(e.props.tool_use_id)
+    if (back) return sentBackRow(t, back, l)
     return noteCard(t, redactDeep(cleanNote(input).note).value, numbers.get(e.props.tool_use_id) ?? null, input.source === 'reconstructed', l)
   }).catch(($: any, e: any, next: any) => next(e))
 

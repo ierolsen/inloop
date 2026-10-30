@@ -195,10 +195,26 @@ that carry the logic, the patterns named), `essentials` (what the code does not 
 consequences, no line detail). The levels before this one, `brief`, `standard` and `deep`, still
 work as `essentials`, `guided` and `full`.
 
-A note's technical terms stay the way developers who speak its language say them, which is
-usually the English term: the first demo in Turkish turned `random_state` into a word-for-word
-"shuffling seed", which no Turkish developer says. The instructions now forbid word-for-word
-translation of terms and ask for them to be kept and explained.
+A note is written the way a developer who speaks its language explains code to a colleague: that
+language's sentences, with every technical word in the form developers use, which is usually
+English. The first Turkish demo turned `random_state` into a word-for-word "shuffling seed"; after
+a rule about terms, the second still wrote "rastgele ve tekrarlanabilir bölme" ("random and
+repeatable division") for `train_test_split`, because Claude read "term" as a name and paraphrased
+the verbs and properties around it. So:
+
+- The rule covers every word with a technical meaning, in every field: what things are (seed,
+  split), what code does (shuffle, fit) and how it behaves (reproducible, deterministic). The
+  field descriptions no longer ask for "plain words", which invited paraphrase; a term's meaning
+  goes in `terms`.
+- For Turkish, German and Dutch the instructions carry examples of the form developers use next
+  to the translation they do not (`hooks/jargon.ts`).
+- The same file lists word-for-word translations developers do not use. A note whose prose holds
+  one is sent back once: the note tool answers that it is not saved yet and names each word with
+  the term to use. The next try for the same files is saved whatever it says (with the words in
+  its `problems`), and at most three notes are sent back in one turn, so it never loops. Code
+  spans, line quotes and the glossary are not checked, and stems with an everyday meaning too
+  (Turkish "karıştır") say which meaning is meant. The sent-back call's row shows one line instead
+  of a card.
 
 ### Explaining code that already exists
 

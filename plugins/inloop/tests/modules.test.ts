@@ -8,6 +8,7 @@ import { redact, redactDeep, sensitive, REDACTED } from '../hooks/redact.ts'
 import { parse, line, sessionsOf, partPath } from '../hooks/log.ts'
 import { porcelain, nul, unaccounted, hunks, counts, state } from '../hooks/outside.ts'
 import { labels, say, hasLabels, count } from '../hooks/i18n/index.ts'
+import { literals, sendBack } from '../hooks/jargon.ts'
 
 test('a language is found by code, English name, native name or another spelling', async () => {
   for (const typed of ['tr', 'TR', 'Turkish', 'Türkçe', 'TÜRKÇE', 'turkce']) expect(language(typed)?.code).toBe('tr')
@@ -44,7 +45,10 @@ test('the instructions name the language, the level and the terminology rule, an
   expect(tr).toContain('mcp__inloop__recap')
   expect(tr).toContain('Turkish (Türkçe)')
   expect(instructions('inloop', language('tr')!, 'full')).toBe(tr)
-  expect(tr).toContain('Never translate a technical term word for word')
+  expect(tr).toContain('Never replace a technical word with an everyday Turkish paraphrase or a word-for-word translation')
+  expect(tr).toContain('not "rastgele ve tekrarlanabilir bölme"')
+  expect(instructions('inloop', language('de')!, 'full')).toContain('not "Zufallssamen"')
+  expect(instructions('inloop', language('fr')!, 'full')).not.toContain(' not "')
   expect(tr).toContain('Add to `terms` every technical term')
   expect(instructions('inloop', language('de')!, 'big-picture')).toContain('leave `lines`, `parameters` and `terms` empty')
   expect(instructions('inloop', language('de')!, 'design')).toContain('fill `impact`')
@@ -174,4 +178,21 @@ test('labels fall back to English and fill their placeholders', async () => {
   expect([0, 1, 2].map((n) => count('en', en.notes, n))).toEqual(['0 notes', '1 note', '2 notes'])
   // a language without labels of its own counts in English, whatever its own rules say
   expect(count('fr', en.notes, 0)).toBe('0 notes')
+})
+
+test('word-for-word translations of technical terms are found in a note\'s prose, not in its code or glossary', async () => {
+  const n = cleanNote({
+    title: 'Veri yükleme', what: 'Satırları karıştırıp böler; `tohum` kodda kalabilir.', why: 'Tekrarlanabilir sonuç için. Karekök ortalama kare hata ölçülür.',
+    files: ['data.py'], lines: [{ anchor: 'random_state=42  # tohum', says: 'Sıfıra bölme yok.' }],
+    terms: [{ term: 'random seed', means: 'Rastgele sayı üretecinin başlangıç değeri, yani tohum.' }],
+  }).note
+  expect(literals(n, 'tr').map((f) => [f.said, f.use])).toEqual([['karıştırıp', 'shuffle'], ['tekrarlanabilir', 'reproducible'], ['karekök ortalama kare hata', 'RMSE']])
+  // the developer form passes, and so does "sıfıra bölme", which is what developers say
+  const good = cleanNote({ title: 'Veri yükleme', what: 'Satırları shuffle edip split eder.', why: 'Reproducible sonuç için; RMSE ölçülür. Sıfıra bölme yok.', files: ['data.py'] }).note
+  expect(literals(good, 'tr')).toEqual([])
+  expect(literals(n, 'fr')).toEqual([])
+  expect(literals(cleanNote({ title: 't', what: 'Die Rohrleitung nutzt einen Zufallssamen.', why: 'w', files: ['a'] }).note, 'de').map((f) => f.use)).toEqual(['Seed', 'Pipeline'])
+  const said = sendBack(literals(n, 'tr'), 'Turkish', 'mcp__inloop__note')
+  expect(said).toContain('"karıştırıp" -> shuffle (when it means shuffling rows or items)')
+  expect(said).toContain('Call `mcp__inloop__note` again with the same note')
 })

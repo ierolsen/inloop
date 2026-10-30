@@ -6,6 +6,7 @@ import type { Labels } from '../i18n/en.ts'
 import { count, say } from '../i18n/index.ts'
 import type { Level } from '../config.ts'
 import { HIDDEN_AT } from './style.ts'
+import { when } from './html.ts'
 import { markKey, type Review, type Group, type NoteRef } from './review.ts'
 import type { Mark, MarkKind } from './anchor.ts'
 
@@ -24,7 +25,8 @@ const line = (text: unknown) => md(text).replace(/\s*\n+\s*/g, ' ')
 const code = (text: string) => '`' + text.replace(/`/g, "'") + '`'
 const short = (sha: string | null) => (sha ?? '').slice(0, 7)
 
-export type MdOptions = { code: string | null; level: Level; version: string; marker: boolean; max: number }
+// command and made: the command that wrote the text and when, for its last line
+export type MdOptions = { code: string | null; level: Level; version: string; marker: boolean; max: number; command: string; made: number }
 type Keep = { marks: boolean; terms: boolean; what: boolean }
 
 function heading(g: Group, l: Labels): string {
@@ -130,7 +132,8 @@ export function markdown(r: Review, l: Labels, o: MdOptions): { text: string; cu
     if (left) out.push('_' + md(count(o.code, l.r_more, left)) + '_')
     for (const g of groups.slice(from)) out.push('---\n\n' + groupMd(g, r, o, keep, l))
     const cut = !keep.marks || !keep.terms || !keep.what || from > 0
-    out.push('---\n\n<sub>' + md(say(l.md_footer, { version: o.version })) + (cut ? ' ' + md(l.md_cut) : '') + '</sub>')
+    if (cut) out.push('_' + md(l.md_cut) + '_')
+    out.push('---\n\n<sub>inloop ' + md(o.version) + ' \u00b7 ' + code(o.command) + ' \u00b7 ' + md(when(o.made, o.code)) + '</sub>')
     return out.join('\n\n') + '\n'
   }
   const steps: Keep[] = [{ marks: true, terms: true, what: true }, { marks: false, terms: true, what: true }, { marks: false, terms: false, what: true }, { marks: false, terms: false, what: false }]

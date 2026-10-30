@@ -38,7 +38,7 @@ test('a card speaks the reader\'s language, draws a half-streamed note, and hide
   const key = 'sk-ant-' + 'k'.repeat(32)
   const ui = await $.ui.mount({ ...row('mcp__inloop__note', { ...NOTE, why: 'Uses ' + key }), surface: 'terminal' } as any)
   expect((await ui.find({ type: 'Markdown', text: /Neden/ }))?.text).toBe('**Neden:** Uses [redacted]')
-  expect(await ui.find({ text: /Sınıflar ve fonksiyonlar/ })).toBeDefined()
+  expect(await ui.find({ text: /Class'lar ve fonksiyonlar/ })).toBeDefined()
 })
 
 test('the recap\'s row is drawn as a summary card; other tools keep their own rows', async ($, on) => {

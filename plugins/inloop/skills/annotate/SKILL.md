@@ -22,6 +22,11 @@ Write the notes in the language the inloop instructions in your system prompt na
 are no inloop instructions (inloop is off in this session), write them in ${user_config.language}.
 Keep code, names and paths as they are in the code.
 
+Write like a developer who speaks that language explaining code to a colleague: its sentences, with
+every technical word in the form developers use, which is usually English (in Turkish, for example,
+"satırları shuffle eder" and "split reproducible", never "karıştırır" or "tekrarlanabilir bölme").
+Explain a term in `terms` instead of translating it.
+
 ## What to explain
 
 - **A file:** one note on the file as a whole (what it is for, where it sits in the project), then

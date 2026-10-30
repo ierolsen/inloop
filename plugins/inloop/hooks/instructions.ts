@@ -2,6 +2,7 @@
 // The text depends only on the settings, so the prompt cache stays valid between requests.
 
 import { type Level, type Language, languageName } from './config.ts'
+import { example } from './jargon.ts'
 
 export const NOTE_TOOL = 'note'
 export const RECAP_TOOL = 'recap'
@@ -26,7 +27,7 @@ const ADHD_RULES = [
   '- One idea per sentence, sentences under 20 words. In `what` and `why`, prefer short lines that start with "- " to paragraphs.',
   '- Put the one or two words a skimming reader must not miss in **bold**.',
   '- Keep the same order every time: what it does, why, what to watch out for.',
-  '- Keep every technical term as developers say it, and explain it the first time it appears: what it means in plain words, with a small example from this code. A formula: each symbol one by one, then what it says.',
+  '- Keep technical words as developers say them, in every field. Explain each term the first time it appears, in `terms`: what it means, with a small example from this code. A formula: each symbol one by one, then what it says.',
   '- For each parameter you mention: what it controls, the value used and why, its default, and when you would change it.',
   '- Give a concrete example before an abstract rule.',
   '- No filler, no repetition, no em-dashes.',
@@ -43,8 +44,8 @@ export function instructions(plugin: string, lang: Language, level: Level, adhd 
     '',
     '1. Before each logical change to files, call `' + note + '` once. A logical change is one idea, such as a new function and the call that uses it, and it may cover several files. List every file it will touch in `files`.',
     '2. Write every text field of the note in ' + name + ', even when the conversation is in another language. Keep code identifiers, file paths, commands and quoted code exactly as they are.',
-    '3. Technical terms stay the way developers who speak ' + name + ' actually say them, which is usually the English term: commit, pull request, pipeline, random seed, train/test split, overfitting, endpoint, cache. Never translate a technical term word for word into a phrase developers do not use. Keep the term, and explain it when the reader may not know it.',
-    '4. `tldr` is the one thing to remember about the change, in one short sentence. `what` says what the change does, in plain words for a reader who did not write the code. `why` gives the reason for this approach. Set `basis` to "verified" when a test, a measurement or documentation you read supports the reason, and to "judgment" when it is your own choice.',
+    '3. Write like a developer who speaks ' + lang.english + ' explaining code to a colleague: ' + lang.english + ' sentences, with every technical word in the form developers use, which is usually English. This holds in every field and for every kind of technical word: what things are (seed, split, pipeline, cache, endpoint), what code does (shuffle, fit, deploy, merge, retry) and how it behaves (reproducible, deterministic, idempotent). Never replace a technical word with an everyday ' + lang.english + ' paraphrase or a word-for-word translation, not even to make a sentence easier; explain the term in `terms` instead.' + (example(lang.code) ? ' ' + example(lang.code) : ''),
+    '4. `tldr` is the one thing to remember about the change, in one short sentence. `what` says what the change does, for a reader who did not write the code. `why` gives the reason for this approach. Set `basis` to "verified" when a test, a measurement or documentation you read supports the reason, and to "judgment" when it is your own choice.',
     '5. Whenever the change adds a class, function, method, endpoint, module or type, add it to `symbols`: why it exists, why it has this shape (for example a class rather than a function), and what calls it.',
     '6. Whenever the change brings in something defined elsewhere (an import, a call to a function or class from another file, a library), add it to `uses`: its `name` as it appears in the code, `from` where (a file path in the project, or the package), and `why` this change uses it here. For a library, also say why this library or class rather than another.',
     '7. `lines` are comments on single lines: `anchor` is text copied exactly from one line of the code you are about to write, long enough to find that line, and `says` explains that line. `terms` explains technical terms: the term as developers say it, and what it means. `impact` names other parts of the system the change affects or depends on.',
@@ -68,7 +69,7 @@ export const NOTE_SPEC = {
       title: text('The change in a few words, like a commit subject.'),
       tldr: text('The one thing to remember about this change, in one short sentence.'),
       files: list('Every file this change will create, edit or delete, as paths relative to the project.', { type: 'string' }),
-      what: text('What the change does, in plain words for a reader who did not write the code.'),
+      what: text('What the change does, for a reader who did not write the code.'),
       why: text('Why this approach: the reason the change is made this way.'),
       basis: { type: 'string', enum: ['verified', 'judgment'], description: '"verified" when a test, a measurement or documentation you read supports the reason; "judgment" when it is your own choice.' },
       uses: list('Things this change uses that are defined somewhere else: in another file of the project or in a library.', {
@@ -108,7 +109,7 @@ export const NOTE_SPEC = {
         type: 'object',
         properties: {
           anchor: text('Text copied exactly from one line of the new code, long enough to find that line.'),
-          says: text('What that line does and why, in plain words.'),
+          says: text('What that line does and why.'),
         },
         required: ['anchor', 'says'],
       }),

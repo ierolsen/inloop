@@ -273,7 +273,7 @@ test('/inloop adhd changes how the next notes are written, not how much they say
   expect((await $.command.run(command('adhd on'))).text).toStartWith('From now on inloop notes are written for easy reading, in all your projects')
   const rules = await written()
   expect(rules).toContain('How to write for this user')
-  expect(rules).toContain('Keep every technical term as developers say it, and explain it')
+  expect(rules).toContain('Keep technical words as developers say them, in every field. Explain each term the first time it appears, in `terms`')
   expect(rules).toContain('Level "guided"') // the level is unchanged
   expect((await $.command.run(command('adhd off --project'))).text).toBe('From now on inloop notes are written in the usual form, in this project.')
   expect(JSON.parse(w.files.get(ROOT + '/.inloop/config.json') ?? '{}')).toEqual({ adhd: 'off' })
@@ -443,8 +443,8 @@ const COMMENTS = 'gh api --paginate repos/erol/shop/issues/7/comments --jq .[] |
 test('/inloop share writes a light page and its Markdown to attach to an email, and sends nothing', async ($, on) => {
   const { w } = await committedShapes($, on)
   const text = (await $.command.run(command('share'))).text
-  expect(text).toStartWith('The page to share is at ' + ROOT + '/.inloop/share/inloop-work.html, and the same as Markdown at ' + ROOT + '/.inloop/share/inloop-work.md.')
-  expect(text).toContain('send it only to people who may see this code')
+  expect(text).toStartWith('Page: ' + ROOT + '/.inloop/share/inloop-work.html\nMarkdown: ' + ROOT + '/.inloop/share/inloop-work.md\n')
+  expect(text).toContain('share it only with people who may see that code')
   expect(w.files.get(ROOT + '/.inloop/share/inloop-work.html')).toContain('data-theme="light" data-fixed')
   const md = w.files.get(ROOT + '/.inloop/share/inloop-work.md') ?? ''
   expect(md).toStartWith('## Review: what Claude changed, and why')
@@ -458,18 +458,18 @@ test('/inloop share pr shows a preview first, posts only with --yes typed by a p
   const { w, git, B } = await committedShapes($, on)
   const posted = () => w.ran.filter((c) => c.startsWith('gh api -X'))
   // no gh: said plainly
-  expect((await $.command.run(command('share pr'))).text).toBe('This needs the GitHub CLI, gh, signed in with `gh auth login`: https://cli.github.com')
+  expect((await $.command.run(command('share pr'))).text).toBe('This needs the GitHub CLI (`gh`), signed in with `gh auth login`: https://cli.github.com')
   Object.assign(git, { 'gh --version': 'gh version 2.82.0\n', [PR_VIEW]: prJson(B, [B]), [PR_VIEW.replace('view', 'view 7')]: prJson(B, [B]), 'gh api user --jq .login': 'erol\n', [COMMENTS]: '' })
   const preview = (await $.command.run(command('share pr'))).text
-  expect(preview).toBe('Nothing is sent yet. This is the comment for pull request #7 (Add shapes), https://github.com/erol/shop/pull/7:\n' + ROOT + '/.inloop/share/pr-7.md\n' +
-    (w.files.get(ROOT + '/.inloop/share/pr-7.md') ?? '').length + ' characters, from 1 commit. `/inloop share pr 7 --yes` adds it as a comment.')
+  expect(preview).toBe('Preview, nothing sent: PR #7 Add shapes\nhttps://github.com/erol/shop/pull/7\nComment: ' + ROOT + '/.inloop/share/pr-7.md (' +
+    (w.files.get(ROOT + '/.inloop/share/pr-7.md') ?? '').length + ' characters, 1 commit)\nTo send it: `/inloop share pr 7 --yes` (a new comment)')
   const comment = w.files.get(ROOT + '/.inloop/share/pr-7.md') ?? ''
   expect(comment).toStartWith('<!-- inloop -->\n')
   expect(comment).toContain('area is width times height')
   expect(posted()).toEqual([])
   // only a person may send: a command from another plugin is refused before gh is asked anything
   const asked = w.ran.length
-  const REFUSED = 'inloop sends something only when you type the command yourself at Claude Code\'s prompt, so nothing was sent.'
+  const REFUSED = 'Not sent: `--yes` works only when you type the command at Claude Code\'s prompt.'
   expect((await $.command.run({ ...command('share pr --yes'), origin: { kind: 'plugin', name: 'other' } })).text).toBe(REFUSED)
   // nor from `claude -p`, which Claude itself could run from a shell
   expect((await $.command.run({ ...command('share pr --yes'), origin: { kind: 'sdk' } })).text).toBe(REFUSED)
@@ -477,19 +477,19 @@ test('/inloop share pr shows a preview first, posts only with --yes typed by a p
   // --yes posts the previewed text as a new comment
   const POST = 'gh api -X POST repos/erol/shop/issues/7/comments --input ' + ROOT + '/.inloop/share/pr-7.body.json --jq .html_url'
   git[POST] = 'https://github.com/erol/shop/pull/7#issuecomment-1\n'
-  expect((await $.command.run(command('share pr --yes'))).text).toBe('inloop\'s comment is on pull request #7: https://github.com/erol/shop/pull/7#issuecomment-1')
+  expect((await $.command.run(command('share pr --yes'))).text).toBe('Comment posted on PR #7: https://github.com/erol/shop/pull/7#issuecomment-1')
   expect(JSON.parse(w.files.get(ROOT + '/.inloop/share/pr-7.body.json') ?? '{}').body).toBe(comment)
   expect(posted()).toEqual([POST])
   // the next time, inloop's own comment is found (by its marker and the person's login) and replaced
   git[COMMENTS] = '555\n'
-  expect((await $.command.run(command('share pr 7'))).text).toContain('`/inloop share pr 7 --yes` replaces inloop\'s earlier comment there with it.')
+  expect((await $.command.run(command('share pr 7'))).text).toContain('`/inloop share pr 7 --yes` (updates inloop\'s earlier comment)')
   const PATCH = 'gh api -X PATCH repos/erol/shop/issues/comments/555 --input ' + ROOT + '/.inloop/share/pr-7.body.json --jq .html_url'
   git[PATCH] = 'https://github.com/erol/shop/pull/7#issuecomment-555\n'
-  expect((await $.command.run(command('share pr 7 --yes'))).text).toBe('inloop\'s comment on pull request #7 is updated: https://github.com/erol/shop/pull/7#issuecomment-555')
+  expect((await $.command.run(command('share pr 7 --yes'))).text).toBe('Comment updated on PR #7: https://github.com/erol/shop/pull/7#issuecomment-555')
   expect(posted()).toEqual([POST, PATCH])
   // a pull request that moved since its preview gets a new preview, not a post
   git[PR_VIEW] = prJson('c3'.repeat(20), [B])
-  expect((await $.command.run(command('share pr --yes'))).text).toStartWith('Nothing was sent: there is no preview for pull request #7, or the pull request changed since. Here is a new one.\nNothing is sent yet.')
+  expect((await $.command.run(command('share pr --yes'))).text).toStartWith('Not sent: no preview for PR #7, or the PR changed since. New preview:\nPreview, nothing sent:')
   expect(posted()).toEqual([POST, PATCH])
   expect((await $.command.run(command('share pr seven'))).text).toStartWith('Use `/inloop share`')
 })
@@ -510,8 +510,32 @@ test('/inloop review pr fetches the pull request into its own ref and reviews it
   expect(w.ran).toContain('git fetch --no-tags --quiet origin +refs/pull/7/head:' + REF)
   expect(w.ran.filter((c) => c.startsWith('git fetch'))).toEqual(['git fetch --no-tags --quiet origin +refs/pull/7/head:' + REF])
   const html = w.files.get(page) ?? ''
-  expect(html).toContain('Commits in pull request #7: Add shapes')
+  expect(html).toContain('Pull request #7: Add shapes')
+  expect(html).toContain('<footer>inloop 0.1.0 &middot; <code>/inloop review pr 7</code> &middot; ')
   expect(html).toContain('area is width times height')
   expect(html).toContain('<section class="view" id="' + fileId('shapes.py') + '"')
   expect((await $.command.run(command('review pr x'))).text).toStartWith('Use `/inloop share`')
+})
+
+test('a note that translates technical terms word for word goes back once; the reworded note is saved', async ($, on) => {
+  const w = worldOf(on, { store: { settings: { language: 'tr' } } })
+  await $.session.start(START)
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  const first = await $.tool.call({ ...note({ title: 'Split', files: ['data.py'], what: 'Satırları karıştırıp böler.', why: 'Tekrarlanabilir sonuç için.' }), tool_use_id: 'n1' })
+  expect(first.result).toStartWith('inloop: the note is not saved yet. Developers who write Turkish (Türkçe) use the technical term for these words: "karıştırıp" -> shuffle')
+  expect(w.records().filter((r) => r.kind === 'note')).toEqual([])
+  // its row is one line, not a card
+  const row = await $.ui.mount({ plugin: 'inloop', component: 'ToolUse', requestId: 'n1', surface: 'terminal', props: { tool_use_id: 'n1', tool: 'mcp__inloop__note', input: { title: 'Split' }, isRunning: false, isErrored: false, isInterrupted: false } } as any)
+  expect(await row.find({ text: /karıştırıp, tekrarlanabilir teknik terimiyle yazılsın diye bir kez geri gönderildi/ })).toBeDefined()
+  // the reworded note is saved
+  const second = await $.tool.call({ ...note({ title: 'Split', files: ['data.py'], what: 'Satırları shuffle edip split eder.', why: 'Sonuç reproducible olsun diye.' }), tool_use_id: 'n2' })
+  expect(second.result).toBe('inloop: note 1 saved.')
+  // a second try that still translates is saved too, with the words named: never a loop
+  await $.tool.call({ ...note({ title: 'Model', files: ['model.py'], what: 'Erken durdurma kullanır.', why: 'w' }), tool_use_id: 'n3' })
+  const again = await $.tool.call({ ...note({ title: 'Model', files: ['model.py'], what: 'Erken durdurma kullanır.', why: 'w' }), tool_use_id: 'n4' })
+  expect(again.result).toContain('saved')
+  expect(w.records().filter((r) => r.kind === 'note').map((r) => r.problems)).toEqual([[], ['technical words written as translations: erken durdurma -> early stopping']])
+  // English notes are never sent back
+  await $.command.run(command('lang en'))
+  expect((await $.tool.call({ ...note({ title: 'X', files: ['x.py'], what: 'Erken durdurma.', why: 'w' }), tool_use_id: 'n5' })).result).toBe('inloop: note 3 saved.')
 })

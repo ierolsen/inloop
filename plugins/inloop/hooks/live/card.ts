@@ -46,6 +46,12 @@ export function noteCard(t: any, note: Note, n: number | null, reconstructed: bo
   return frame(t, parts)
 }
 
+// A note inloop sent back once for its wording: one line instead of the card, as the reworded note
+// that follows is the one kept
+export function sentBackRow(t: any, words: string[], l: Labels): any {
+  return t.Text({ children: [t.Text({ color: 'cyan', bold: true, children: 'inloop' }), t.Text({ dimColor: true, children: ' · ' + say(l.card_sent_back, { words: words.join(', ') }) })] })
+}
+
 export function recapCard(t: any, recap: Recap, l: Labels): any {
   const parts: any[] = [head(t, [l.page_summary])]
   if (recap.overview) parts.push(t.Markdown({ text: clip(recap.overview) }))

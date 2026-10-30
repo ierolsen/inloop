@@ -25,7 +25,10 @@ The first version.
 - `/inloop:annotate`: explanations of existing code and of past commits.
 - Five levels of explanation (`/inloop level`), from `full` to `big-picture`; the page can hide
   detail down to the big picture.
-- Technical terms kept as developers say them in every language, with a glossary in each note.
+- Technical words kept as developers say them in every language (names, verbs and properties),
+  with a glossary in each note; for Turkish, German and Dutch, a note with a word-for-word
+  translation is sent back once to be reworded.
+- The page's footer is one line: the inloop version, the command that wrote it, and when.
 - Notes in any language; inloop's own labels in English, Turkish, German and Dutch.
 - `/inloop adhd`: an ADHD-friendly form for the notes.
 - Secrets redacted before anything is written; nothing leaves the computer.

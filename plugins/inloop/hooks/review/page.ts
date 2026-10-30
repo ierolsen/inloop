@@ -20,8 +20,9 @@ import { folders, fileId, dirId, covers, UNCOMMITTED, type Explorer, type FilePa
 
 export const PAGE_BYTES = 3_800_000 // under the 4 MiB a mod may write in one file
 export type Mode = 'review' | 'explain'
-// level: the level the page opens at; written: whether the logs say the notes were written at it
-export type Options = { code: string | null; theme: Theme; version: string; level: Level; written: boolean; mode: Mode; start: string | null }
+// level: the level the page opens at; written: whether the logs say the notes were written at it;
+// command and made: the command that wrote the page and when, for its footer
+export type Options = { code: string | null; theme: Theme; version: string; level: Level; written: boolean; mode: Mode; start: string | null; command: string; made: number }
 // What fit() has left out so far: the diffs under each file's Changes tab, then the code beside
 // the why view's commits. Both stay on the page elsewhere.
 export type Trim = { changes: boolean; why: boolean }
@@ -69,6 +70,7 @@ const newestFirst = (groups: Group[]) => [...groups.filter((g) => g.kind !== 'ex
 
 function scopeName(c: Ctx): string {
   const { r, l } = c
+  if (r.pr) return say(l.r_scope_pr, { number: r.pr.number, title: r.pr.title })
   return r.scope === 'session' ? l.r_scope_session : r.scope === 'all' ? l.r_scope_all : say(l.r_scope_range, { range: r.range ?? '' })
 }
 
@@ -112,6 +114,18 @@ type Block = {
   lineIds?: Map<number, string> // anchors on lines, where the why view jumps to
 }
 
+// The pins beside one line. More than two would widen the gutter and push this line's code to the
+// right of the lines around it, which reads as indentation, so they become one pin with their range
+// ("6-9", or "6+3" when they are not consecutive); the explanations beside the code list them all.
+export function pinsHtml(at: number[], kindOf: Map<number, MarkKind>): string {
+  const one = (n: number) => '<span class="pin ' + lv(kindOf.get(n) ?? 'line') + '">' + n + '</span>'
+  if (at.length <= 2) return at.map(one).join('')
+  const kinds = new Set(at.map((n) => kindOf.get(n) ?? 'line'))
+  const run = at.every((n, i) => i === 0 || n === at[i - 1] + 1)
+  const label = run ? at[0] + '-' + at[at.length - 1] : at[0] + '+' + (at.length - 1)
+  return '<span class="pin wide' + (kinds.size === 1 ? ' ' + lv([...kinds][0]) : '') + '" title="' + at.join(', ') + '">' + label + '</span>'
+}
+
 function blockHtml(b: Block, c: Ctx): string {
   const lang = languageOf(b.path)
   const kindOf = new Map<number, MarkKind>()
@@ -119,7 +133,7 @@ function blockHtml(b: Block, c: Ctx): string {
   const row = (line: Line | null, i: number) => {
     if (!line) return '<tr class="gap"><td colspan="' + (b.numbers === 2 ? 5 : 3) + '">&#8943;</td></tr>'
     const at = b.pinAt.get(i) ?? []
-    const pins = at.map((n) => '<span class="pin ' + lv(kindOf.get(n) ?? 'line') + '">' + n + '</span>').join('')
+    const pins = pinsHtml(at, kindOf)
     const cls = line.kind === '+' && b.numbers === 2 ? ' class="a"' : line.kind === '-' ? ' class="d"' : ''
     const id = b.lineIds?.get(i)
     const nums = b.numbers === 2 ? '<td class="o">' + (line.old ?? '') + '</td><td class="n">' + (line.new ?? '') + '</td>' : '<td class="n">' + (line.new ?? '') + '</td>'
@@ -517,7 +531,7 @@ export function render(r: Review, x: Explorer, l: Labels, o: Options, trim: Trim
   views.push(indexView(c))
   const known = (id: string) => id === 'overview' || id === 'd-root' || shown.has(id) || x.files.some((p) => p.id === id) || (id.startsWith('d-') && folders(x.root).some((n) => dirId(n.path) === id))
   const start = o.start && known(o.start) ? o.start : 'overview'
-  const foot = '<footer>' + esc(say(l.r_footer, { version: o.version })) + '</footer>'
+  const foot = '<footer>inloop ' + esc(o.version) + ' &middot; <code>' + esc(o.command) + '</code> &middot; ' + esc(when(o.made, o.code)) + '</footer>'
   const body = appbar(c) + '\n<input type="checkbox" id="drawer" class="drawer-toggle" aria-hidden="true" tabindex="-1"><label class="scrim" for="drawer" aria-hidden="true"></label>\n<div class="app">' + sidebar(c) +
     '<main class="views">\n' + views.filter(Boolean).join('\n') + '\n' + foot + '</main></div>'
   return shell(say(l.page_title, { project: r.project || 'inloop' }), o.code, o.theme, CSS + startCss(start), body, SCRIPT, { 'data-level': o.level, 'data-start': start })

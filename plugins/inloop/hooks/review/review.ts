@@ -24,6 +24,7 @@ export type Source = {
   git: boolean
   scope: 'session' | 'range' | 'all'
   range: string | null
+  pr?: { number: number; title: string } | null // the pull request a range stands for
   project: string
 }
 
@@ -48,6 +49,7 @@ export type Review = {
   project: string
   scope: Source['scope']
   range: string | null
+  pr: { number: number; title: string } | null
   git: boolean
   started: number | null
   groups: Group[] // commits, oldest first, then what is not committed
@@ -188,7 +190,7 @@ export function build(src: Source): Review {
   const relevant = recaps.filter((r) => sessions.has(r.session) || src.scope === 'session')
   const levels = [...sessions].map((s) => levelOf.get(s)).filter((l): l is Level => !!l)
   return {
-    project: src.project, scope: src.scope, range: src.range, git: src.git, started, groups, explained, more: src.more,
+    project: src.project, scope: src.scope, range: src.range, pr: src.pr ?? null, git: src.git, started, groups, explained, more: src.more,
     recaps: relevant.map((r) => r.recap),
     checks: [...new Set(relevant.flatMap((r) => r.recap.check_by_hand))],
     index, links,

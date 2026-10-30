@@ -12,7 +12,7 @@ import { parsePatch, added, current, clip, flat, lineCount } from '../hooks/revi
 import { highlight, languageOf } from '../hooks/review/highlight.ts'
 import { place, segments } from '../hooks/review/anchor.ts'
 import { build } from '../hooks/review/review.ts'
-import { render, fit } from '../hooks/review/page.ts'
+import { render, fit, pinsHtml } from '../hooks/review/page.ts'
 import { explore, parseBlame, slug, fileId, dirId, folders } from '../hooks/review/explorer.ts'
 import { markdown, md, MARKER, COMMENT_MAX } from '../hooks/review/markdown.ts'
 import { roleOf, fixedOrder } from '../hooks/review/roles.ts'
@@ -183,7 +183,7 @@ const STATES = [
   stateOf('docs/old/notes.md', null, null, 'deleted'),
 ]
 const INFO = new Map([['a1a1a1a1', { summary: 'chore: start', time: 1_600_000_000_000 }]])
-const OPTIONS = { code: 'tr', theme: 'auto' as const, version: '0.1.0', level: 'guided' as const, written: true, mode: 'review' as const, start: null }
+const OPTIONS = { code: 'tr', theme: 'auto' as const, version: '0.1.0', level: 'guided' as const, written: true, mode: 'review' as const, start: null, command: '/inloop review', made: 1_700_000_000_000 }
 
 // Every anchor once, and every link inside the page lands on one: a link to nothing would quietly
 // show the overview instead.
@@ -240,9 +240,9 @@ test('the explorer: a tree of files, each with its code, its changes and why eac
   expect(html).toContain('body:not(:has(:target)) #overview { display: block; }')
   expect(html).toContain('[data-level="essentials"] .lv-param')
   expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
-  for (const word of ['Review: Claude neyi değiştirdi, neden', 'Commit 1 / 4', 'Henüz commitlenmedi', 'Sonradan açıklanan kod', 'Sınıf ve fonksiyon dizini', 'Otomatik', 'PDF olarak kaydet',
+  for (const word of ['Review: Claude neyi değiştirdi, neden', 'Commit 1 / 4', 'Henüz commitlenmedi', 'Sonradan açıklanan kod', 'Class&#39;lar ve fonksiyonlar', 'Otomatik', 'PDF olarak kaydet',
     'Dosyaya git', 'Genel bakış', 'Değişiklikler', 'Neden', 'Son değişiklik', 'Hepsini PDF yap', 'tam anlatım', 'büyük resim', 'bu review&#39;da yok', 'Açıklanmış ama satırları sonradan değişmiş',
-    'kaynak: shapes.py', 'picks the <strong>biggest</strong>', 'Bu commit için inloop notu yok', '<code>/inloop:annotate f6f6f6f</code>', 'içerik kaydedilmedi', '1 gizli değer saklandı',
+    'kaynak: shapes.py', 'picks the <strong>biggest</strong>', 'Bu commit&#39;in notu yok', '<code>/inloop:annotate f6f6f6f</code>', 'içerik kaydedilmedi', '1 secret gizlendi',
     'Elle kontrol edilecekler', 'Added <strong>shapes</strong>.', 'Terimler', '<dt>random seed</dt>', 'Etkisi', 'app.py relies on largest()', '<code>/inloop:annotate README.md</code>']) {
     expect(html, word).toContain(word)
   }
@@ -261,6 +261,8 @@ test('the explorer: a tree of files, each with its code, its changes and why eac
   expect(en).toContain('<html lang="en" data-theme="dark" data-fixed data-level="big-picture" data-start="' + fileId('app.py') + '">')
   expect(en).toContain('body:not(:has(:target)) #' + fileId('app.py') + ' { display: block; }')
   for (const word of ['Explain: the code as it stands', 'Commit 1 of 4', '2 older commits in this range are not shown.', 'not in this review', 'Go to file']) expect(en, word).toContain(word)
+  expect(html).toContain('<footer>inloop 0.1.0 &middot; <code>/inloop review</code> &middot; ')
+  expect(html).not.toContain('internet')
   expect(html + en).not.toContain('\u2014')
   // a start that is not on the page falls back to the overview
   expect(render(r, x, labels('en'), { ...OPTIONS, start: 'f-nowhere' })).toContain('data-start="overview"')
@@ -285,13 +287,13 @@ test('a page over its budget leaves out what it shows twice first, then the long
   expect(tiny.groups.length).toBe(1)
   const r = build(src)
   const small = fit(r, explore(r, states as any, INFO), labels('en'), { ...OPTIONS, code: 'en' }, Math.round(full / 3)).html
-  expect(small).toContain('The code of this file is left out to keep the page small')
+  expect(small).toContain('Code left out to keep the page under its size limit')
   expect(small).toContain('See this change in its commit')
 })
 
 test('the Markdown of a review: no HTML and no mentions from a note, levels as on the page, and within its limit', async () => {
   expect(md('a <b> `x<y> @a` @erol & @team-x')).toBe('a &lt;b&gt; `x<y> @a` @⁠erol &amp; @⁠team-x')
-  const O = { code: 'en', level: 'full' as const, version: '0.1.0', marker: true, max: COMMENT_MAX }
+  const O = { code: 'en', level: 'full' as const, version: '0.1.0', marker: true, max: COMMENT_MAX, command: '/inloop share pr 7', made: 1_700_000_000_000 }
   const full = markdown(build(source()), labels('en'), O)
   expect(full.text.startsWith(MARKER + '\n\n## Review: what Claude changed, and why\n\n<sub>4 commits \u00b7 7 files \u00b7 5 notes</sub>\n')).toBe(true)
   expect(full.cut).toBe(false)
@@ -308,11 +310,18 @@ test('the Markdown of a review: no HTML and no mentions from a note, levels as o
     const tight = markdown(build(source()), labels('en'), { ...O, max })
     expect(tight.text.length, String(max)).toBeLessThanOrEqual(max)
     expect(tight.cut, String(max)).toBe(true)
-    expect(tight.text, String(max)).toContain('Some detail is left out')
+    expect(tight.text, String(max)).toContain('Shortened to fit GitHub\'s comment limit')
   }
   // the line-by-line part goes first
   const less = markdown(build(source()), labels('en'), { ...O, max: full.text.length - 100 }).text
   expect(less).not.toContain('Line by line')
   expect(less).toContain('random seed')
   expect(markdown(build(source()), labels('tr'), { ...O, code: 'tr' }).text).toContain('Satır satır (2)')
+})
+
+test('more than two pins on a line become one, so the gutter keeps its width and the code its indentation', async () => {
+  const kinds = new Map<number, any>([[6, 'param'], [7, 'param'], [8, 'param'], [9, 'param'], [3, 'line']])
+  expect(pinsHtml([6, 7], kinds)).toBe('<span class="pin lv-param">6</span><span class="pin lv-param">7</span>')
+  expect(pinsHtml([6, 7, 8, 9], kinds)).toBe('<span class="pin wide lv-param" title="6, 7, 8, 9">6-9</span>')
+  expect(pinsHtml([3, 7, 8], kinds)).toBe('<span class="pin wide" title="3, 7, 8">3+2</span>')
 })

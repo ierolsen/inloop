@@ -269,6 +269,7 @@ dl.terms dd { margin: 0; min-width: 0; }
 .src td.m { width: calc(1ch + 4px); padding: 0 2px; color: var(--faint); user-select: none; }
 .src td.p { width: 50px; padding: 0 4px; user-select: none; white-space: nowrap; }
 .src td.p .pin { width: 18px; height: 18px; font-size: 10.5px; margin-right: 2px; }
+.src td.p .pin.wide { width: auto; min-width: 18px; padding: 0 5px; border-radius: 9px; letter-spacing: -0.02em; }
 .src tr.a td { background: var(--add); }
 .src tr.a td.o, .src tr.a td.n { background: var(--add-gutter); color: var(--add-ink); }
 .src tr.a td.m { color: var(--add-ink); }

@@ -40,9 +40,9 @@ want, and in an ADHD-friendly form if you want.
 - **Five levels of detail.** From `full` (nearly every line explained, every term defined) through
   `guided`, `essentials` and `design` to `big-picture` (architecture and consequences only). The
   page can switch to a higher level to hide detail.
-- **Technical terms stay technical.** A note in Turkish or German says "train/test split" and
-  "random seed" as developers there do, and explains them, instead of translating them word by
-  word.
+- **Technical words stay technical.** A note in Turkish says "satırları shuffle edip split eder"
+  and "random_state ile reproducible", as Turkish developers do, never a word-for-word translation,
+  and explains the terms in a glossary. A note that slips is sent back once to be reworded.
 - **In your language.** Notes are written in the language you choose, whatever language you chat
   in. inloop's own labels are in English, Turkish, German and Dutch.
 - **ADHD-friendly, on request.** `/inloop adhd on`: the point first, short lines, bold key words,
