@@ -34,9 +34,10 @@ need it for, and in an ADHD-friendly form if you want.
   `/inloop share pr` writes a comment for your pull request, commit by commit, and shows it to you
   first; `/inloop share pr --yes` posts it, or updates inloop's earlier comment instead of adding
   another.
-- **Share it.** `/inloop share` writes the page and a Markdown version to `.inloop/share/` and
-  shows them in your file manager, ready to attach to an email. The page opens in any browser,
-  offline, and prints to PDF.
+- **Share it.** `/inloop share` asks where the review goes: a new e-mail with the page attached,
+  the page on your clipboard to paste into Slack, Teams or a chat, a comment on the pull request,
+  or the files in `.inloop/share/`. The page opens in any browser, offline, and prints to PDF.
+  inloop never sends it: you add who it goes to and send it, or paste it yourself.
 - **Code you did not watch being written.** `/inloop:annotate` asks Claude to explain existing
   code, a folder, or a range of commits after the fact, in the same format, marked as explained
   afterwards.
@@ -88,7 +89,10 @@ To try it in one session without installing, clone this repository and run
 | `/inloop review <range>` | Any commits: `main..`, `HEAD~5..`, `a1b2c3d`; `all` for every commit inloop recorded |
 | `/inloop review pr [n]` | A pull request, fetched from GitHub with `gh` (the current branch's without a number) |
 | `/inloop explain [path]` | The code as it stands, opened on a file or folder, with every explanation inloop has |
-| `/inloop share [range]` | The page and its Markdown in `.inloop/share/`, to attach to an email |
+| `/inloop share [range]` | Asks where the review goes: e-mail, Slack or Teams, a pull request, or a file |
+| `/inloop share mail [range]` | A new e-mail in your mail app with the page attached (on a Mac) |
+| `/inloop share copy [range]` | The page on your clipboard, to paste into Slack, Teams or a chat (on a Mac) |
+| `/inloop share file [range]` | The page and its Markdown in `.inloop/share/` |
 | `/inloop share pr [n]` | A preview of a comment for the pull request; add `--yes` to post it |
 | `/inloop review ... --theme light` | The page with a fixed theme, to share or print (`dark` also works) |
 | `/inloop:annotate <target>` | Claude explains existing code: a file, a folder, a function, a commit range |

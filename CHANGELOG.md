@@ -19,8 +19,12 @@ The first version.
 - `/inloop explain [path]`: the same page on the code as it stands, opened on a file or folder.
 - `/inloop review pr [n]`: a pull request, fetched into `refs/inloop/pr-<n>` and reviewed as it
   stands there.
-- `/inloop share`: the page and its Markdown in `.inloop/share/`, shown in the file manager to
-  attach to an email.
+- `/inloop share`: asks where the review goes. `share mail` opens a new message in your mail app
+  with the page attached and `share copy` puts the page on the clipboard to paste into Slack,
+  Teams or a chat (both on a Mac); `share file` writes the page and its Markdown to
+  `.inloop/share/` and shows them in the file manager.
+- `/inloop status` (or `/inloop` alone) shows each setting with the command that changes it and
+  the commands to go on with.
 - `/inloop share pr [n]`: a comment for the pull request, commit by commit, previewed first;
   `--yes` posts it or updates inloop's earlier comment, through your own `gh`.
 - `/inloop:annotate`: explanations of existing code and of past commits.

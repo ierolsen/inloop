@@ -28,7 +28,8 @@ Claude Code (`/inloop lang`, `/inloop tags`, `/inloop adhd`); a project's choice
 
 inloop's own code makes no network requests and calls no model. The mods API lists every call a
 plugin makes, and `claude plugin validate plugins/inloop` prints inloop's: files, processes (`git`,
-`gh`, and the command that opens a page or a folder), the session, the plugin store and the user
+`gh`, the command that opens a page or a folder, and on a Mac `plutil` and `osascript` for
+`/inloop share`), the `HOME` environment variable, the session, the plugin store and the user
 interface.
 
 Only the pull request commands use the network, through your own `gh` and `git`:
@@ -46,7 +47,14 @@ Only the pull request commands use the network, through your own `gh` and `git`:
 Neither command ever waits for a password: `gh` and `git` run with their prompts turned off and
 fail with a message instead.
 
-`/inloop share` writes files on your computer only. The review page is a single HTML file. It
+`/inloop share` writes files on your computer and sends nothing itself. On a Mac,
+`/inloop share mail` reads which app opens `mailto:` links from macOS's Launch Services settings
+(`plutil` on a file in `~/Library/Preferences`) and hands the page to that app with `open -b`, as
+if you had dropped the file on it: the app opens a new message with the page attached, and you
+choose who gets it and send it. When that app is a browser (web mail), inloop only shows the file.
+`/inloop share copy` puts the page on the clipboard as a file with `osascript`, so you can paste it
+into Slack, Teams or a chat; it replaces what the clipboard held. Elsewhere both show the file in
+your file manager instead. The review page is a single HTML file. It
 loads no fonts, scripts, images or styles from anywhere, and its Content-Security-Policy forbids
 it to. It holds the code of the files the review covers (up to 40), redacted as below, so send it
 only to people who may see that code.

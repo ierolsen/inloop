@@ -26,6 +26,8 @@ export type World = {
   room: boolean // whether a pane that opens finds room
   toasts: string[]
   shell: ((command: string) => void) | null // what a Bash call does in this world, such as making a commit
+  asked: any[] // the questions put to the person in Claude Code's dialog
+  answer: string | null // what the person picks there; null dismisses the question
   // the log of this session as inloop wrote it, line by line
   records: () => any[]
 }
@@ -45,6 +47,8 @@ export function worldOf(on: On, given: { files?: Record<string, string>; git?: G
     room: true,
     toasts: [],
     shell: null,
+    asked: [],
+    answer: null,
     records: () => (world.files.get(LOG) ?? '').split('\n').filter(Boolean).map((l) => JSON.parse(l)),
   }
   const files = world.files
@@ -98,6 +102,12 @@ export function worldOf(on: On, given: { files?: Record<string, string>; git?: G
   on('turn.complete', ($: any, e: any) => ({ text: e.answer }))
   // the built-in edit tools, run against the files above
   on('tool.call', ($: any, e: any) => {
+    // $.ui.ask reaches the engine as a call to AskUserQuestion
+    if (e.tool === 'AskUserQuestion') {
+      world.asked.push(e.questions[0])
+      if (world.answer === null) return { deny: 'The person dismissed the question.' }
+      return { result: { answers: { [e.questions[0].question]: world.answer } } }
+    }
     if (e.tool === 'Bash') {
       world.shell?.(String(e.command))
       return { result: { stdout: '', stderr: '', interrupted: false } }

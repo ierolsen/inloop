@@ -429,13 +429,13 @@ test('/inloop explain shows the code of the file asked for, even in a project wi
 })
 
 // A session that wrote shapes.py and committed it as B on top of A, for the sharing tests
-async function committedShapes($: any, on: any, more: Record<string, unknown> = {}) {
+async function committedShapes($: any, on: any, more: Record<string, unknown> = {}, start: any = START) {
   const A = 'a1'.repeat(20)
   const B = 'b2'.repeat(20)
   const SHAPES = 'class Rectangle:\n    def area(self):\n        return self.w * self.h\n'
   const git: Git = { 'git rev-parse --show-toplevel': ROOT + '\n', 'git rev-parse --verify --quiet HEAD': A + '\n', 'git status --porcelain=v1 -z --untracked-files=all': '' }
   const w = worldOf(on, { git })
-  await $.session.start(START)
+  await $.session.start(start)
   await $.turn.start({ text: 'build', turnId: 't1' })
   await $.tool.call({ ...note({ title: 'Shapes', files: ['shapes.py'], symbols: [{ name: 'Rectangle', kind: 'class', why_exists: 'holds sizes' }], lines: [{ anchor: 'return self.w * self.h', says: 'area is width times height, ask @erol' }], ...more }), tool_use_id: 'n1' })
   await $.tool.call({ tool: 'Write', tool_use_id: 'w1', file_path: ROOT + '/shapes.py', content: SHAPES } as any)
@@ -462,9 +462,9 @@ const PR_VIEW = 'gh pr view --json number,title,url,headRefOid,commits'
 const prJson = (head: string, commits: string[]) => JSON.stringify({ number: 7, title: 'Add shapes', url: 'https://github.com/erol/shop/pull/7', headRefOid: head, commits: commits.map((oid) => ({ oid })) })
 const COMMENTS = 'gh api --paginate repos/erol/shop/issues/7/comments --jq .[] | select(.user.login == "erol" and (.body | startswith("<!-- inloop -->"))) | .id'
 
-test('/inloop share writes a light page and its Markdown to attach to an email, and sends nothing', async ($, on) => {
+test('/inloop share file writes a light page and its Markdown to attach to an email, and sends nothing', async ($, on) => {
   const { w } = await committedShapes($, on)
-  const text = (await $.command.run(command('share'))).text
+  const text = (await $.command.run(command('share file'))).text
   expect(text).toStartWith('Page: ' + ROOT + '/.inloop/share/inloop-work.html\nMarkdown: ' + ROOT + '/.inloop/share/inloop-work.md\n')
   expect(text).toContain('share it only with people who may see that code')
   expect(w.files.get(ROOT + '/.inloop/share/inloop-work.html')).toContain('data-theme="light" data-fixed')
@@ -476,10 +476,52 @@ test('/inloop share writes a light page and its Markdown to attach to an email, 
   expect((await $.command.run(command('share link'))).text).toStartWith('Sharing by link (a secret gist) comes in a later version.')
 })
 
+test('/inloop share asks where the review goes; on a Mac the mail app gets the page attached, or the clipboard holds it', async ($, on) => {
+  on('env.get', () => ({ value: '/Users/me' }))
+  const { w, git } = await committedShapes($, on)
+  const PAGE = ROOT + '/.inloop/share/inloop-work.html'
+  const PLIST = 'plutil -convert json -o - /Users/me/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist'
+  Object.assign(git, { 'uname -s': 'Darwin\n', [PLIST]: JSON.stringify({ LSHandlers: [{ LSHandlerURLScheme: 'slack', LSHandlerRoleAll: 'com.tinyspeck.slackmacgap' }] }), ['open -b com.apple.mail ' + PAGE]: '' })
+  // the person picks e-mail in the dialog: no mailto: handler chosen, so Apple Mail gets the page
+  w.answer = 'E-mail: a new message with the page attached'
+  const mailed = (await $.command.run(command('share'))).text
+  expect(w.asked[0].question).toBe('How do you want to share this review?')
+  expect(w.asked[0].options.map((o: any) => o.label)).toEqual(['E-mail: a new message with the page attached', 'Slack, Teams or a chat: the page on your clipboard',
+    'Pull request: a comment on this branch\'s PR, shown to you first', 'File: the page and its Markdown in .inloop/share'])
+  expect(mailed).toStartWith('A new message in your mail app has the page attached (' + PAGE + '): add who it goes to and send it.')
+  expect(w.ran).toContain('open -b com.apple.mail ' + PAGE)
+  expect(w.files.get(PAGE)).toContain('data-theme="light" data-fixed')
+  // dismissed: the commands to use instead
+  w.answer = null
+  expect((await $.command.run(command('share'))).text).toStartWith('Share it with:\n  /inloop share mail    a new e-mail with the page attached\n')
+  // a typed answer counts by its first word
+  git['osascript -e on run argv -e set the clipboard to (POSIX file (item 1 of argv)) -e end run ' + PAGE] = ''
+  w.answer = 'copy it please'
+  expect((await $.command.run(command('share'))).text).toStartWith('The page is on your clipboard: paste it into Slack, Teams, a chat or an e-mail.')
+  // web mail cannot take a file: the page is shown, to attach by hand
+  git[PLIST] = JSON.stringify({ LSHandlers: [{ LSHandlerURLScheme: 'mailto', LSHandlerRoleAll: 'com.google.Chrome' }] })
+  git['open -R ' + PAGE] = ''
+  expect((await $.command.run(command('share mail'))).text).toBe('Your e-mail opens in a browser, which cannot take a file from inloop. The page is at ' + PAGE + ': attach it to the e-mail.\nShown in your file manager.')
+  expect(w.ran.filter((c) => c.startsWith('gh '))).toEqual([])
+})
+
+test('away from a Mac, and with nobody to ask, /inloop share falls back to the file', async ($, on) => {
+  const { w } = await committedShapes($, on, {}, { ...START, isInteractive: false })
+  const PAGE = ROOT + '/.inloop/share/inloop-work.html'
+  // claude -p: nobody to ask, so the page is written and the other ways are listed
+  const text = (await $.command.run(command('share'))).text
+  expect(text).toStartWith('Page: ' + PAGE + '\n')
+  expect(text).toContain('\n\nShare it with:\n')
+  expect(w.asked).toEqual([])
+  expect((await $.command.run(command('share copy'))).text).toStartWith('The page could not go on the clipboard here. It is at ' + PAGE + ': drag it into Slack')
+  expect((await $.command.run(command('share mail'))).text).toStartWith('The page is at ' + PAGE + ': attach it to an e-mail.')
+  expect((await $.command.run(command('share mail main.. extra'))).text).toBe('Use `/inloop share`, `/inloop share mail|copy|file [range]` or `/inloop share pr [number] [--yes]`.')
+})
+
 test('parts a skill wrote beyond the tags are on the page and in its Markdown', async ($, on) => {
   // /inloop:onboard or /inloop:annotate under the default review tag fills terms, which learn names
   const { w } = await committedShapes($, on, { terms: [{ term: 'dunder method', means: 'a method Python calls for an operator' }] })
-  await $.command.run(command('share'))
+  await $.command.run(command('share file'))
   const html = w.files.get(ROOT + '/.inloop/share/inloop-work.html') ?? ''
   expect(html).toContain('data-tags="review,learn"')
   // the dialog marks only the session's own tag as written

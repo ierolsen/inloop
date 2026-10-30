@@ -811,15 +811,95 @@ async function commitsByOid($: any, oids: string[]): Promise<{ commits: GitCommi
 
 const shareFile = (name: string) => root + '/' + SHARE_DIR + '/' + name
 
-// /inloop share [range | all]: the page with a fixed theme and its Markdown, in .inloop/share,
-// shown in the file manager to attach to an email
-async function share($: any, what: string, theme: Theme, l: Labels): Promise<string> {
+// /inloop share [mail | copy | file] [range | all]: the page with a fixed theme and its Markdown in
+// .inloop/share, then the page in a new e-mail, on the clipboard or in the file manager.
+// The words it takes for where a review goes; a pull request has its own command.
+type ShareTo = 'mail' | 'copy' | 'file'
+const SHARE_TO: Record<string, ShareTo> = { mail: 'mail', email: 'mail', 'e-mail': 'mail', copy: 'copy', clipboard: 'copy', slack: 'copy', teams: 'copy', file: 'file' }
+
+// /inloop share with no destination: the person picks one in the dialog Claude Code asks questions
+// in. A dismissed question lists the commands; with nobody to ask (claude -p) the page is written as
+// a file, as before, with the commands after it.
+async function chooseShare($: any, what: string, theme: Theme, origin: string, l: Labels): Promise<string> {
+  if (!interactive) return (await share($, 'file', what, theme, l)) + '\n\n' + l.share_menu
+  const options: [ShareTo | 'pr', string][] = [['mail', l.share_opt_mail], ['copy', l.share_opt_copy], ['pr', l.share_opt_pr], ['file', l.share_opt_file]]
+  let answer = ''
+  try {
+    answer = String(await $.ui.ask(l.share_ask, options.map(([, label]) => label)))
+  } catch {
+    return l.share_menu
+  }
+  // a typed answer counts when it starts with a destination's word
+  const word = answer.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
+  const picked = options.find(([, label]) => label === answer)?.[0] ?? (word === 'pr' ? 'pr' : SHARE_TO[word])
+  if (!picked) return l.share_menu
+  if (picked === 'pr') return sharePr($, '', false, origin, l)
+  return share($, picked, what, theme, l)
+}
+
+// Browsers a Mac may open mailto: links with, for web mail, which cannot take a file from here
+const BROWSERS = new Set(['com.apple.safari', 'com.google.chrome', 'com.google.chrome.canary', 'org.mozilla.firefox', 'com.microsoft.edgemac',
+  'company.thebrowser.browser', 'com.brave.browser', 'com.operasoftware.opera', 'com.vivaldi.vivaldi', 'org.chromium.chromium', 'app.zen-browser.zen'])
+
+// The app that opens mailto: links on this Mac, from Launch Services; Apple Mail when none is chosen
+async function mailApp($: any): Promise<string> {
+  try {
+    const home = String((await $.env.get('HOME')) ?? '')
+    const plist = home + '/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist'
+    const r = await $.process.run(['plutil', '-convert', 'json', '-o', '-', plist], { cwd: root, timeoutMs: 5000 })
+    const handlers = r.exitCode === 0 ? JSON.parse(r.stdout).LSHandlers : []
+    const mailto = Array.isArray(handlers) ? handlers.find((h: any) => h?.LSHandlerURLScheme === 'mailto') : null
+    if (typeof mailto?.LSHandlerRoleAll === 'string' && mailto.LSHandlerRoleAll !== '-') return mailto.LSHandlerRoleAll
+  } catch {
+    // no preferences to read: the system's choice
+  }
+  return 'com.apple.mail'
+}
+
+// A new message in the person's mail app with the page attached. On a Mac whose mail app is not a
+// browser, `open -b` hands the page to the app as a file dropped on it, which starts a message; the
+// person adds who it goes to and sends it. Elsewhere the page is shown in the file manager, to attach.
+async function mailDraft($: any, page: string, l: Labels): Promise<string> {
+  if (interactive && (await onMac($))) {
+    const app = await mailApp($)
+    if (BROWSERS.has(app.toLowerCase())) {
+      const shown = await reveal($, page)
+      return say(l.share_mail_web, { path: page }) + (shown ? '\n' + l.share_file_shown : '')
+    }
+    try {
+      if ((await $.process.run(['open', '-b', app, page], { cwd: root, timeoutMs: 15000 })).exitCode === 0) return say(l.share_mail_opened, { path: page })
+    } catch {
+      // the app would not take it: attach by hand
+    }
+  }
+  const shown = await reveal($, page)
+  return say(l.share_mail_attach, { path: page }) + (shown ? '\n' + l.share_file_shown : '')
+}
+
+// The page on the clipboard as a file, to paste into Slack, Teams, a chat or an e-mail. On a Mac
+// only; the path goes to osascript as an argument, never into the script. Elsewhere the page is shown
+// in the file manager, to drag.
+async function toClipboard($: any, page: string, l: Labels): Promise<string> {
+  if (interactive && (await onMac($))) {
+    try {
+      const argv = ['osascript', '-e', 'on run argv', '-e', 'set the clipboard to (POSIX file (item 1 of argv))', '-e', 'end run', page]
+      if ((await $.process.run(argv, { cwd: root, timeoutMs: 15000 })).exitCode === 0) return l.share_copied
+    } catch {
+      // no clipboard here: drag the file
+    }
+  }
+  const shown = await reveal($, page)
+  return say(l.share_copy_failed, { path: page }) + (shown ? '\n' + l.share_file_shown : '')
+}
+
+// Writes the review as a light page and its Markdown in .inloop/share, then hands the page on
+async function share($: any, to: ShareTo, what: string, theme: Theme, l: Labels): Promise<string> {
   const all = await fresh($)
   const s = await scopeOf($, what, all, l)
   if (typeof s === 'string') return s
   const model = modelOf(s, all, await explainedFiles($, all))
   const code = shownIn(settings.language.code)
-  const command = ('/inloop share ' + what).trim()
+  const command = ['/inloop share', to, what].filter(Boolean).join(' ')
   const text = markdown(model, labels(code), { code, tags: shownTags(model), version: VERSION, marker: false, max: SHARE_MD_MAX, command, made: now() }).text
   const { html, cut } = await pageOf($, model, s.end, { theme: theme === 'auto' ? 'light' : theme, mode: 'review', extra: [], start: null, command })
   const name = 'inloop-' + project().replace(/[^\w.-]+/g, '_').slice(0, 40) + (what ? '-' + nameOfRange(what).replace(/^review-?/, '') : '')
@@ -828,8 +908,11 @@ async function share($: any, what: string, theme: Theme, l: Labels): Promise<str
   await keepOutOfGit($)
   await $.fs.write(page, html)
   await $.fs.write(md, text)
+  const trimmed = cut ? '\n' + l.review_trimmed : ''
+  if (to === 'mail') return (await mailDraft($, page, l)) + trimmed
+  if (to === 'copy') return (await toClipboard($, page, l)) + trimmed
   const shown = await reveal($, page)
-  return say(l.share_file, { path: page, md }) + (shown ? '\n' + l.share_file_shown : '') + (cut ? '\n' + l.review_trimmed : '')
+  return say(l.share_file, { path: page, md }) + (shown ? '\n' + l.share_file_shown : '') + trimmed
 }
 
 // Writes the comment for a pull request where the person can read it first, with what it was made
@@ -960,7 +1043,7 @@ export function register(on: any, pluginOptions: any) {
       await $.command.register({
         name: PLUGIN,
         description: 'inloop: review Claude\'s work, explain the code as it stands, what the notes hold (tags), their language, on and off',
-        argumentHint: '[review [range | all | pr [n]] | explain [path] | share [range | pr [n] [--yes]] | tags <tag,...> | status | lang <language> | adhd on|off | on | off | help]',
+        argumentHint: '[review [range | all | pr [n]] | explain [path] | share [mail | copy | file] [range] | share pr [n] [--yes] | tags <tag,...> | status | lang <language> | adhd on|off | on | off | help]',
         immediate: true,
       })
     } catch (err) {
@@ -1129,13 +1212,18 @@ export function register(on: any, pluginOptions: any) {
       try {
         if (command === 'explain') return { text: await explain($, args.join(' '), theme, l) }
         if (command === 'review') return { text: args[0] === 'pr' ? await reviewPr($, args[1] ?? '', theme, l) : await review($, args[0] ?? '', theme, l) }
-        const [how = 'file', ...more] = args
+        const [first = '', ...more] = args
         const yes = more.includes('--yes')
         const plain = more.filter((w) => w !== '--yes')
-        if (how === 'pr') return { text: plain.length > 1 ? l.share_bad : await sharePr($, plain[0] ?? '', yes, String(e.origin?.kind ?? ''), l) }
-        if (how === 'link') return { text: l.share_link_later }
-        if (yes) return { text: l.share_bad }
-        return { text: await share($, how === 'file' ? plain[0] ?? '' : how, theme, l) }
+        const origin = String(e.origin?.kind ?? '')
+        if (first === 'pr') return { text: plain.length > 1 ? l.share_bad : await sharePr($, plain[0] ?? '', yes, origin, l) }
+        if (first === 'link') return { text: l.share_link_later }
+        if (yes || plain.length > 1) return { text: l.share_bad }
+        const to = SHARE_TO[first.toLowerCase()]
+        if (to) return { text: await share($, to, plain[0] ?? '', theme, l) }
+        // no destination named: the first word, if any, is the range
+        if (plain.length) return { text: l.share_bad }
+        return { text: await chooseShare($, first, theme, origin, l) }
       } catch (err) {
         return { text: say(l.review_failed, { error: String(err) }) }
       }
