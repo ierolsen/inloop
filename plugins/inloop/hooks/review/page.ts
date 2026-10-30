@@ -96,6 +96,7 @@ function markHtml(m: Mark, ref: NoteRef, pin: number | null, l: Labels): string 
   if (m.kind === 'param') {
     const p = n.parameters[m.item]
     return head(p.name, l.r_param) + '<div class="lead rich">' + rich(p.meaning) + '</div>' +
+      (p.value ? '<p><b>' + esc(l.page_param_value) + ':</b> <code>' + esc(p.value) + '</code></p>' : '') +
       (p.why_this_value ? '<p><b>' + esc(l.page_param_why) + ':</b> ' + span(p.why_this_value) + '</p>' : '') +
       (p.default ? '<p><b>' + esc(l.page_param_default) + ':</b> <code>' + esc(p.default) + '</code></p>' : '') + (p.doc_url ? '<p>' + docs(p.doc_url) + '</p>' : '')
   }

@@ -50,6 +50,8 @@ test('settings come from the project, then the user, then the plugin, then the d
 })
 
 test('the instructions name the language, the tags and the terminology rule, and depend only on them', async () => {
+  // no example comes from the bench's fixture, or Claude would echo it in the tasks measured there
+  for (const t of TAGS) expect(instructions('inloop', language('en')!, [t], true)).not.toMatch(/households|AveOccup|Population|income_per_room|bedroom/)
   const tr = instructions('inloop', language('tr')!, ['all'])
   expect(tr).toContain('mcp__inloop__note')
   expect(tr).toContain('mcp__inloop__recap')
@@ -89,7 +91,7 @@ test('a note is cleaned: strings trimmed, lists coerced, bad URLs dropped, gaps 
   expect(note.files).toEqual(['greet.py'])
   expect(note.basis).toBe(null)
   expect(note.alternatives).toEqual(['a dict', '7'])
-  expect(note.parameters).toEqual([{ name: 'timeout', meaning: 'seconds', default: null, why_this_value: null, doc_url: null }])
+  expect(note.parameters).toEqual([{ name: 'timeout', meaning: 'seconds', value: null, default: null, why_this_value: null, doc_url: null }])
   expect(note.symbols.map((s) => s.kind)).toEqual(['class', 'other'])
   expect(note.uses).toEqual([{ name: 'format', from: 'string', why: 'pads the name', doc_url: null }])
   expect(note.lines).toEqual([{ anchor: 'def greet', says: 'the entry' }])

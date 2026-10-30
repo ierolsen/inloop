@@ -1,7 +1,7 @@
 // What Claude sends to the note and recap tools, cleaned up, and which note each edit belongs to.
 // Plain module: no mods API calls here.
 
-export type Parameter = { name: string; meaning: string; default: string | null; why_this_value: string | null; doc_url: string | null }
+export type Parameter = { name: string; meaning: string; value: string | null; default: string | null; why_this_value: string | null; doc_url: string | null }
 export type SymbolKind = 'class' | 'function' | 'method' | 'endpoint' | 'module' | 'type' | 'other'
 export type Symbol = { name: string; kind: SymbolKind; file: string | null; why_exists: string; why_this_shape: string | null; called_by: string | null }
 // Something the change brings in from another file or a library, and why
@@ -91,6 +91,7 @@ export function cleanNote(input: Record<string, unknown>): { note: Note; problem
     parameters: arr(input.parameters).map(obj).filter((p) => str(p.name)).map((p) => ({
       name: str(p.name, 200),
       meaning: str(p.meaning),
+      value: opt(p.value, 500),
       default: opt(p.default, 500),
       why_this_value: opt(p.why_this_value),
       doc_url: url(p.doc_url),

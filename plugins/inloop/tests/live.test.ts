@@ -6,7 +6,7 @@ const SURFACES = ['terminal', 'desktop', 'vscode', 'mobile'] as const
 const NOTE = {
   title: 'Add a Rectangle class', files: ['shapes.py'], what: 'Adds `Rectangle` with `area()`.', why: 'The CLI compares rectangles by area.',
   basis: 'judgment', symbols: [{ name: 'Rectangle', kind: 'class', why_exists: 'Holds width and height.' }],
-  parameters: [{ name: 'default', meaning: 'value for an empty list', default: 'None', why_this_value: 'An empty list must not raise.' }],
+  parameters: [{ name: 'default', meaning: 'value for an empty list', value: '0', default: 'None', why_this_value: 'An empty list must not raise.' }],
   risks: ['Negative sizes are not checked.'],
 }
 const row = (tool: string, input: unknown, id = 'toolu_1') => ({
@@ -24,7 +24,7 @@ test('a note\'s row is drawn as a card on every surface, numbered once the note 
     expect(await ui.find({ text: 'Add a Rectangle class' }), surface).toBeDefined()
     expect((await ui.find({ type: 'Markdown', text: /The CLI compares/ }))?.text, surface).toBe('**Why:** The CLI compares rectangles by area.')
     expect(await ui.find({ type: 'Markdown', text: /`Rectangle` \(class\): Holds width and height\./ }), surface).toBeDefined()
-    expect(await ui.find({ type: 'Markdown', text: /`default` = `None`: An empty list must not raise\./ }), surface).toBeDefined()
+    expect(await ui.find({ type: 'Markdown', text: /`default` = `0` \(default `None`\): An empty list must not raise\./ }), surface).toBeDefined()
     await ui.unmount()
   }
 })

@@ -379,6 +379,17 @@ test('what was found after a change shows under its note, with the reason, in th
     .toContain('**Outcome**\n\n- The tests pass: **4 of 4**.')
 })
 
+test('a parameter shows the value the code uses next to its default, on the page and in Markdown', async () => {
+  const param = { name: 'key', meaning: 'how shapes are compared', value: 'len', default: 'None', why_this_value: 'the longest list wins' }
+  const records = RECORDS.map((x: any) => (x.kind === 'note' && x.id === 'n1' ? { ...x, note: noteOf({ ...x.note, parameters: [param] }) } : x))
+  const r = build(source({ records }))
+  const html = render(r, explore(r, STATES as any, INFO), labels('en'), { ...OPTIONS, code: 'en' })
+  expect(html).toContain('<p><b>Value:</b> <code>len</code></p>')
+  expect(html).toContain('<p><b>Default:</b> <code>None</code></p>')
+  const text = markdown(r, labels('en'), { code: 'en', tags: ['all'], version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text
+  expect(text).toContain('`key` = `len` (parameter, default `None`): how shapes are compared')
+})
+
 test('a dialog chooses the tags: every tag in English with what it adds, the tags the notes were written with pressed', async () => {
   const r = build(source())
   const html = render(r, explore(r, STATES as any, INFO), labels('tr'), OPTIONS)

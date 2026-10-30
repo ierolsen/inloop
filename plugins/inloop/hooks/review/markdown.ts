@@ -65,7 +65,7 @@ function markLine(m: Mark, ref: NoteRef, where: { path: string; at: number | nul
   }
   if (m.kind === 'param') {
     const p = n.parameters[m.item]
-    return '- ' + at + code(p.name) + ' (' + l.r_param + '): ' + line(p.meaning) + (p.why_this_value ? ' ' + l.page_param_why + ': ' + line(p.why_this_value) : '')
+    return '- ' + at + code(p.name) + (p.value ? ' = ' + code(p.value) : '') + ' (' + l.r_param + (p.default && p.default !== p.value ? ', ' + l.param_default_short + ' ' + code(p.default) : '') + '): ' + line(p.meaning) + (p.why_this_value ? ' ' + l.page_param_why + ': ' + line(p.why_this_value) : '')
   }
   if (m.kind === 'removed') {
     const x = n.removed[m.item]

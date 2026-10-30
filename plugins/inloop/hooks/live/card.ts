@@ -37,7 +37,8 @@ export function noteCard(t: any, note: Note, n: number | null, reconstructed: bo
     parts.push(block(t, l.page_symbols, list(note.symbols.map((s) => code(s.name) + ' (' + l[('page_kind_' + s.kind) as 'page_kind_class'] + '): ' + s.why_exists))))
   }
   if (note.parameters.length) {
-    parts.push(block(t, l.page_parameters, list(note.parameters.map((p) => code(p.name) + (p.default ? ' = ' + code(p.default) : '') + ': ' + (p.why_this_value || p.meaning)))))
+    parts.push(block(t, l.page_parameters, list(note.parameters.map((p) => code(p.name) + (p.value ? ' = ' + code(p.value) : '') +
+      (p.default && p.default !== p.value ? ' (' + l.param_default_short + ' ' + code(p.default) + ')' : '') + ': ' + (p.why_this_value || p.meaning)))))
   }
   if (note.removed.length) parts.push(block(t, l.page_removed, list(note.removed.map((x) => '~~' + code(x.anchor) + '~~: ' + x.says))))
   if (note.terms.length) parts.push(block(t, l.r_terms, list(note.terms.map((x) => '**' + x.term.replace(/\*/g, '') + '**: ' + x.means))))
