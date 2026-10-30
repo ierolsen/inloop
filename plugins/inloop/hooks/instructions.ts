@@ -10,11 +10,11 @@ export const RECAP_TOOL = 'recap'
 // What each level asks Claude to write. A level changes the focus, not only the length: the deeper
 // levels explain the code line by line and every term, the higher ones the decisions behind it.
 export const LEVEL_RULES: Record<Level, string> = {
-  'full': 'Level "full explanation": write for a reader new to this code or to this kind of code. Add a `lines` comment for nearly every line you change, so the change reads line by line. Add to `terms` every technical term, abbreviation, formula and library concept the change relies on. Add to `parameters` every argument of each call you add or change, and the other important parameters of that function, each with its meaning, its default and why it has this value. Fill every field of each symbol, and list the alternatives you considered.',
-  'guided': 'Level "guided": write for a developer who knows the language but not this code. Add `lines` comments for the lines that carry the logic: a tricky expression, a magic number, a call whose effect is not obvious. Name the pattern when the code follows one (for example a factory, a pipeline, a retry with backoff). Add to `terms` the terms such a developer may not know, and to `parameters` every argument whose meaning or value is not obvious. Fill every field of each symbol.',
-  'essentials': 'Level "key points": write for an experienced developer. Keep `what` and `why` short and add only what the code does not show by itself: surprising values, edge cases, risks. Keep `lines` to the few lines a reviewer would stop at; leave `terms` empty.',
-  'design': 'Level "design decisions": write for someone who reviews design. Focus `why` on the decision and its trade-offs, list in `alternatives` the options you weighed and why you rejected them, and fill `impact` with the other parts of the system this change affects, depends on or makes harder to change. Add a `lines` comment only where a line carries a decision.',
-  'big-picture': 'Level "big picture": write for someone who looks at the whole system. Keep each note to the architectural meaning of the change: how it fits the system, what it commits the project to, long-term consequences and risks, in `why`, `impact` and `risks`. Keep `what` to one sentence and leave `lines`, `parameters` and `terms` empty.',
+  'full': 'Level "full explanation": write for a reader new to this code or to this kind of code. Add a `lines` comment for nearly every line you change, and a `removed` comment for every line or block you delete, so the change reads line by line. Add to `terms` every technical term, abbreviation, formula and library concept the change relies on. Add to `parameters` every argument of each call you add or change, and the other important parameters of that function, each with its meaning, its default and why it has this value. Fill every field of each symbol, and list the alternatives you considered.',
+  'guided': 'Level "guided": write for a developer who knows the language but not this code. Add `lines` comments for the lines that carry the logic: a tricky expression, a magic number, a call whose effect is not obvious. Add a `removed` comment for each deleted line or block that carried logic. Name the pattern when the code follows one (for example a factory, a pipeline, a retry with backoff). Add to `terms` the terms such a developer may not know, and to `parameters` every argument whose meaning or value is not obvious. Fill every field of each symbol.',
+  'essentials': 'Level "key points": write for an experienced developer. Keep `what` and `why` short and add only what the code does not show by itself: surprising values, edge cases, risks. Keep `lines` and `removed` to the few lines a reviewer would stop at; leave `terms` empty.',
+  'design': 'Level "design decisions": write for someone who reviews design. Focus `why` on the decision and its trade-offs, list in `alternatives` the options you weighed and why you rejected them, and fill `impact` with the other parts of the system this change affects, depends on or makes harder to change. Add a `lines` or `removed` comment only where a line carries a decision.',
+  'big-picture': 'Level "big picture": write for someone who looks at the whole system. Keep each note to the architectural meaning of the change: how it fits the system, what it commits the project to, long-term consequences and risks, in `why`, `impact` and `risks`. Keep `what` to one sentence and leave `lines`, `removed`, `parameters` and `terms` empty.',
 }
 
 // The written form for readers who take in short, ordered text more easily. It changes how the
@@ -48,7 +48,7 @@ export function instructions(plugin: string, lang: Language, level: Level, adhd 
     '4. `tldr` is the one thing to remember about the change, in one short sentence. `what` says what the change does, for a reader who did not write the code. `why` gives the reason for this approach. Set `basis` to "verified" when a test, a measurement or documentation you read supports the reason, and to "judgment" when it is your own choice.',
     '5. Whenever the change adds a class, function, method, endpoint, module or type, add it to `symbols`: why it exists, why it has this shape (for example a class rather than a function), and what calls it.',
     '6. Whenever the change brings in something defined elsewhere (an import, a call to a function or class from another file, a library), add it to `uses`: its `name` as it appears in the code, `from` where (a file path in the project, or the package), and `why` this change uses it here. For a library, also say why this library or class rather than another.',
-    '7. `lines` are comments on single lines: `anchor` is text copied exactly from one line of the code you are about to write, long enough to find that line, and `says` explains that line. `terms` explains technical terms: the term as developers say it, and what it means. `impact` names other parts of the system the change affects or depends on.',
+    '7. `lines` are comments on single lines: `anchor` is text copied exactly from one line of the code you are about to write, long enough to find that line, and `says` explains that line. `removed` does the same for lines you delete: `anchor` is copied from a line of the code as it is now, and `says` why it goes and what, if anything, takes its place. Name in `what` everything the change removes: a function, a feature, a parameter, a file. `terms` explains technical terms: the term as developers say it, and what it means. `impact` names other parts of the system the change affects or depends on.',
     '8. ' + LEVEL_RULES[level],
     '9. When you finish a task that changed files, call `' + recap + '` once: an overview, the order to read the changed files in and why, the files grouped by role, and what the user should check by hand. Write it in the same language as the notes.',
     '10. Prefer the Edit and Write tools for changing files. When you must change files with a shell command, call `' + note + '` before that command too.',
@@ -110,6 +110,14 @@ export const NOTE_SPEC = {
         properties: {
           anchor: text('Text copied exactly from one line of the new code, long enough to find that line.'),
           says: text('What that line does and why.'),
+        },
+        required: ['anchor', 'says'],
+      }),
+      removed: list('Comments on lines of the current code that this change deletes.', {
+        type: 'object',
+        properties: {
+          anchor: text('Text copied exactly from one line that is being deleted, as it is in the code now, long enough to find that line.'),
+          says: text('Why that line goes, and what takes its place, if anything.'),
         },
         required: ['anchor', 'says'],
       }),

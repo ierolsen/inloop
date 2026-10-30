@@ -97,6 +97,12 @@ function markHtml(m: Mark, ref: NoteRef, pin: number | null, l: Labels): string 
       (p.why_this_value ? '<p><b>' + esc(l.page_param_why) + ':</b> ' + span(p.why_this_value) + '</p>' : '') +
       (p.default ? '<p><b>' + esc(l.page_param_default) + ':</b> <code>' + esc(p.default) + '</code></p>' : '') + (p.doc_url ? '<p>' + docs(p.doc_url) + '</p>' : '')
   }
+  if (m.kind === 'removed') {
+    // beside its line the deleted code is in view; elsewhere (in the list of what found no line) it is quoted
+    const x = n.removed[m.item]
+    return '<div class="head">' + pinHtml + '<span class="kind gone">' + esc(l.r_removed) + '</span></div>' +
+      (pin ? '' : '<p><code class="gone">' + esc(x.anchor) + '</code></p>') + '<div class="lead rich">' + rich(x.says) + '</div>'
+  }
   const x = n.lines[m.item]
   return '<div class="head">' + pinHtml + '<div class="lead rich">' + rich(x.says) + '</div></div>'
 }
@@ -323,12 +329,13 @@ function absent(page: FilePage, c: Ctx): string | null {
 }
 
 function codeHtml(page: FilePage, c: Ctx): string {
-  const gone = absent(page, c)
-  if (gone) return hint(gone)
-  const lead = page.refs.size || page.moved.length ? '' : hint(say(c.l.x_annotate_hint, { path: page.path }))
+  const missing = absent(page, c)
+  if (missing) return hint(missing)
+  const lead = page.refs.size || page.moved.length || page.gone ? '' : hint(say(c.l.x_annotate_hint, { path: page.path }))
+  const gone = page.gone ? '<p class="hint"><a href="#' + page.id + '_changes">' + esc(count(c.code, c.l.x_removed_hint, page.gone)) + '</a></p>' : ''
   const lineIds = new Map(page.why.map((w) => [w.from, page.id + '_L' + (w.from + 1)]))
   const block: Block = { pinId: (n) => page.id + '_' + n, lines: page.lines, rows: page.rows, pins: page.pins, pinAt: page.pinAt, numbers: 1, path: page.path, lineIds }
-  return lead + (page.lines.length ? '<div class="file code"><div class="rows">' + blockHtml(block, c) + '</div></div>' : '') + movedHtml(page, c)
+  return lead + gone + (page.lines.length ? '<div class="file code"><div class="rows">' + blockHtml(block, c) + '</div></div>' : '') + movedHtml(page, c)
 }
 
 // Explanations whose lines a later commit rewrote: listed under the code, each with its commit
@@ -496,6 +503,7 @@ export function render(r: Review, x: Explorer, l: Labels, o: Options, trim: Trim
     add('use', n.uses.length)
     add('param', n.parameters.length)
     add('line', n.lines.length)
+    add('removed', n.removed.length)
   }
   // an explanation's place: its pin in the code as it stands, else in its commit's diff
   const where = new Map<string, string>()

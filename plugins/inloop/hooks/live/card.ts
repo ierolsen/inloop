@@ -39,6 +39,7 @@ export function noteCard(t: any, note: Note, n: number | null, reconstructed: bo
   if (note.parameters.length) {
     parts.push(block(t, l.page_parameters, list(note.parameters.map((p) => code(p.name) + (p.default ? ' = ' + code(p.default) : '') + ': ' + (p.why_this_value || p.meaning)))))
   }
+  if (note.removed.length) parts.push(block(t, l.page_removed, list(note.removed.map((x) => '~~' + code(x.anchor) + '~~: ' + x.says))))
   if (note.terms.length) parts.push(block(t, l.r_terms, list(note.terms.map((x) => '**' + x.term.replace(/\*/g, '') + '**: ' + x.means))))
   if (note.impact.length) parts.push(block(t, l.r_impact, list(note.impact)))
   if (note.alternatives.length) parts.push(block(t, l.page_alternatives, list(note.alternatives)))

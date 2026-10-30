@@ -6,7 +6,7 @@ import type { Line } from './patch.ts'
 import type { Note } from '../note.ts'
 import { sameFile } from '../note.ts'
 
-export type MarkKind = 'symbol' | 'use' | 'param' | 'line'
+export type MarkKind = 'symbol' | 'use' | 'param' | 'line' | 'removed'
 export type Mark = { kind: MarkKind; note: string; item: number } // the note's id, the item's index in its list
 export type Placed = { at: number; mark: Mark } // at: index into the file's lines (null gaps included)
 export type Segment = { from: number; to: number; marks: Mark[] } // lines from..to, inclusive
@@ -73,7 +73,7 @@ export function place(path: string, lines: (Line | null)[], notes: { id: string;
   const free = new Set<number>()
   const put = (mark: Mark, at: number | null) => {
     if (taken.has(markKey(mark)) || at === null) return
-    if (mark.kind === 'line') used.add(at)
+    if (mark.kind === 'line' || mark.kind === 'removed') used.add(at)
     taken.add(markKey(mark))
     placed.push({ at, mark })
   }
@@ -97,6 +97,12 @@ export function place(path: string, lines: (Line | null)[], notes: { id: string;
       const anchor = bare(x.anchor)
       put({ kind: 'line', note: id, item }, anchor ? find(lines, used, (t) => bare(t).includes(anchor)) : null)
     })
+    // a deleted line is only ever a removed line of the diff: the same text may still stand elsewhere
+    const gone = lines.map((l) => (l && l.kind === '-' ? l : null))
+    note.removed.forEach((x, item) => {
+      const anchor = bare(x.anchor)
+      put({ kind: 'removed', note: id, item }, anchor ? find(gone, used, (t) => bare(t).includes(anchor)) : null)
+    })
   }
   return placed.sort((a, b) => a.at - b.at)
 }
@@ -109,6 +115,7 @@ export function marks(notes: { id: string; note: Note }[]): Mark[] {
     note.uses.forEach((_, item) => out.push({ kind: 'use', note: id, item }))
     note.parameters.forEach((_, item) => out.push({ kind: 'param', note: id, item }))
     note.lines.forEach((_, item) => out.push({ kind: 'line', note: id, item }))
+    note.removed.forEach((_, item) => out.push({ kind: 'removed', note: id, item }))
   }
   return out
 }

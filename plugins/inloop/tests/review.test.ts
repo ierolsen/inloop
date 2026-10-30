@@ -325,3 +325,38 @@ test('more than two pins on a line become one, so the gutter keeps its width and
   expect(pinsHtml([6, 7, 8, 9], kinds)).toBe('<span class="pin wide lv-param" title="6, 7, 8, 9">6-9</span>')
   expect(pinsHtml([3, 7, 8], kinds)).toBe('<span class="pin wide" title="3, 7, 8">3+2</span>')
 })
+
+test('a deleted line is explained beside it in the diff, and the code as it stands points there', async () => {
+  // shapes.py loses its largest() and its print: the note says why, quoting the lines it deletes
+  const CUT = [
+    'diff --git a/shapes.py b/shapes.py', 'index 1111111..2222222 100644', '--- a/shapes.py', '+++ b/shapes.py',
+    '@@ -1,6 +1,4 @@', ' class Rectangle:', '     def area(self):', '         return self.w * self.h', '-', '-def largest(rects):', '-    return max(rects, key=lambda r: r.area())',
+  ].join('\n')
+  const [cut] = parsePatch(CUT)
+  const n9 = noteOf({ title: 'Drop largest', files: ['shapes.py'], removed: [{ anchor: 'def largest(rects):', says: 'Nobody calls it **any more**.' }, { anchor: 'return self.w', says: 'never found: the line stays' }, { anchor: 'nowhere at all', says: 'lost' }] })
+  // only a deleted line takes the comment: "return self.w" still stands, so that one finds no line
+  expect(place('shapes.py', flat(cut), [{ id: 'n9', note: n9 }]).map((p) => [p.at, p.mark.kind, p.mark.item])).toEqual([[4, 'removed', 0]])
+  const src = source({
+    records: [...RECORDS, noteRec('n9', { title: 'Drop largest', files: ['shapes.py'], removed: n9.removed }), rec('commit', { sha: 'a8a8a8a8', parents: ['f6f6f6f6'], subject: 'refactor: drop largest', files: ['shapes.py'], edits: [], notes: ['n9'] })],
+    commits: [...COMMITS, { sha: 'a8a8a8a8', parents: ['f6f6f6f6'], author: 'E', time: 1_700_000_400_000, subject: 'refactor: drop largest', body: '', files: [{ patch: cut, redactions: 0, hidden: null, cut: false }] }],
+  })
+  const r = build(src)
+  const states = STATES.map((s) => (s.path === 'shapes.py' ? stateOf('shapes.py', 'class Rectangle:\n    def area(self):\n        return self.w * self.h\n', ['b2b2b2b2', 'b2b2b2b2', 'b2b2b2b2']) : s))
+  const x = explore(r, states as any, INFO)
+  const shapes = x.byPath.get('shapes.py')!
+  expect(shapes.gone).toBe(1)
+  expect(shapes.moved.map((m) => m.mark.kind)).not.toContain('removed')
+  const html = render(r, x, labels('tr'), OPTIONS)
+  linksHold(html)
+  // in the commit: the pin on the red line, the comment marked as a deleted line
+  expect(html).toContain('<td class="p"><span class="pin lv-line">1</span></td><td class="m">-</td><td class="c"><span class="t-k">def</span> <span class="t-f">largest</span>(rects):</td>')
+  expect(html).toContain('<span class="kind gone">silinen satır</span></div><div class="lead rich"><p>Nobody calls it <strong>any more</strong>.</p></div>')
+  // what found no deleted line is listed with the code it quoted
+  expect(html).toContain('<code class="gone">nowhere at all</code>')
+  // the code as it stands says where the explanation went
+  expect(html).toContain('<p class="hint"><a href="#' + fileId('shapes.py') + '_changes">Silinen 1 satırın açıklaması Değişiklikler sekmesinde.</a></p>')
+  // in Markdown, the deleted line is struck through, with its old line number
+  const text = markdown(build(src), labels('en'), { code: 'en', level: 'full', version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text
+  expect(text).toContain('- `shapes.py:5` ~~`def largest(rects):`~~ (deleted line): Nobody calls it **any more**.')
+  expect(markdown(build(src), labels('en'), { code: 'en', level: 'design', version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text).not.toContain('deleted line')
+})

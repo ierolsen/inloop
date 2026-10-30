@@ -38,6 +38,8 @@ test('a card speaks the reader\'s language, draws a half-streamed note, and hide
   const key = 'sk-ant-' + 'k'.repeat(32)
   const ui = await $.ui.mount({ ...row('mcp__inloop__note', { ...NOTE, why: 'Uses ' + key }), surface: 'terminal' } as any)
   expect((await ui.find({ type: 'Markdown', text: /Neden/ }))?.text).toBe('**Neden:** Uses [redacted]')
+  const cut = await $.ui.mount({ ...row('mcp__inloop__note', { ...NOTE, removed: [{ anchor: 'def old():', says: 'Yerine new() geldi.' }] }, 'toolu_8'), surface: 'terminal' } as any)
+  expect((await cut.find({ type: 'Markdown', text: /Silinen satırlar/ }))?.text).toBe('**Silinen satırlar**\n- ~~`def old():`~~: Yerine new() geldi.')
   expect(await ui.find({ text: /Class'lar ve fonksiyonlar/ })).toBeDefined()
 })
 

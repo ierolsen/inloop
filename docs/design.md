@@ -103,6 +103,13 @@ stand, and opens it on the file or folder named.
   (compared without whitespace). Every mark is placed once per commit and numbered; what finds no
   line is listed under its note. A name the review defines links to its definition from other
   lines.
+- **Deleted lines are explained too.** A note's `removed` comments quote lines the change deletes
+  and say why they go and what takes their place. They are placed only on a deleted line of the
+  diff (the same text may still stand elsewhere), marked as a deleted line, and struck through in
+  Markdown. A deleted line never stands in the code, so the Code view does not list them with the
+  explanations whose lines moved; it says how many there are and links to the file's Changes.
+  Before this field, a test run that removed a feature, a parameter and a file deleted 19 lines in
+  four commits and explained none of them beside the code: the notes only named them in `what`.
 - **A file explorer.** People browse code on GitHub, so the page is laid out the same way: the
   files the review covers in a tree (a folder holding one folder on one line, status letters,
   note counts), "Go to file" on `t`, and one view at a time. Folder views list each entry with its

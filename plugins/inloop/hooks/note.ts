@@ -6,7 +6,8 @@ export type SymbolKind = 'class' | 'function' | 'method' | 'endpoint' | 'module'
 export type Symbol = { name: string; kind: SymbolKind; file: string | null; why_exists: string; why_this_shape: string | null; called_by: string | null }
 // Something the change brings in from another file or a library, and why
 export type Use = { name: string; from: string; why: string; doc_url: string | null }
-// A comment on one line of the new code, found again by a piece of that line's text
+// A comment on one line of the new code, found again by a piece of that line's text; for a line the
+// change deletes, the text is quoted from the code as it was
 export type LineNote = { anchor: string; says: string }
 // A technical term kept as developers say it, with what it means
 export type Term = { term: string; means: string }
@@ -23,6 +24,7 @@ export type Note = {
   parameters: Parameter[]
   symbols: Symbol[]
   lines: LineNote[]
+  removed: LineNote[] // why lines the change deletes go
   terms: Term[]
   impact: string[]
   risks: string[]
@@ -96,6 +98,7 @@ export function cleanNote(input: Record<string, unknown>): { note: Note; problem
       called_by: opt(s.called_by),
     })),
     lines: arr(input.lines).map(obj).filter((x) => str(x.anchor) && str(x.says)).map((x) => ({ anchor: str(x.anchor, 300), says: str(x.says) })),
+    removed: arr(input.removed).map(obj).filter((x) => str(x.anchor) && str(x.says)).map((x) => ({ anchor: str(x.anchor, 300), says: str(x.says) })),
     terms: arr(input.terms).map(obj).filter((x) => str(x.term) && str(x.means)).map((x) => ({ term: str(x.term, 200), means: str(x.means) })),
     impact: strings(input.impact),
     risks: strings(input.risks),

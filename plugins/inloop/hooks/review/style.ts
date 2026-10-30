@@ -257,6 +257,8 @@ dl.terms dd { margin: 0; min-width: 0; }
 .gloss .head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; }
 .gloss .head b { overflow-wrap: anywhere; }
 .gloss .kind { color: var(--muted); font-size: 13px; }
+.kind.gone { color: var(--del-ink); }
+code.gone { text-decoration: line-through; color: var(--del-ink); }
 .gloss p { margin: 4px 0 0; }
 .gloss .lead { margin: 0; }
 .pin { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 700; font-family: system-ui, sans-serif; }

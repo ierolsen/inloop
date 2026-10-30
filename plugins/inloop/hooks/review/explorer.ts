@@ -45,6 +45,7 @@ export type FilePage = {
   pinAt: Map<number, number[]> // line index to pins
   refs: Map<string, NoteRef> // the notes placed on this file
   moved: Moved[]
+  gone: number // comments on lines the review's commits deleted from this file: they live in its diffs
   why: BlameGroup[]
   changes: { group: Group; file: FileView }[] // the file's diffs, commit by commit
   tooBig: boolean
@@ -110,7 +111,7 @@ export function explore(review: Review, states: FileState[], blameInfo: Map<stri
   const files: FilePage[] = states.map((state) => {
     const page: FilePage = {
       path: state.path, id: fileId(state.path), state, lines: [], rows: [], pins: new Map(), pinAt: new Map(), refs: new Map(),
-      moved: [], why: [], changes: [], tooBig: false,
+      moved: [], gone: 0, why: [], changes: [], tooBig: false,
     }
     for (const g of groups) for (const f of g.files) if (f.data.patch.path === state.path) page.changes.push({ group: g, file: f })
     if (state.text === null) return page
@@ -174,6 +175,7 @@ export function explore(review: Review, states: FileState[], blameInfo: Map<stri
       for (const [key, pin] of f.pins) {
         if (onPage.has(key) || seen.has(key)) continue
         const [kind, item] = key.split(':').slice(-2)
+        if (kind === 'removed') { page.gone += 1; continue } // a deleted line never stands in the code
         const note = key.slice(0, key.length - kind.length - item.length - 2)
         const ref = refOf.get(note)
         if (!ref) continue

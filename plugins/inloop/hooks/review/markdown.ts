@@ -67,6 +67,10 @@ function markLine(m: Mark, ref: NoteRef, where: { path: string; at: number | nul
     const p = n.parameters[m.item]
     return '- ' + at + code(p.name) + ' (' + l.r_param + '): ' + line(p.meaning) + (p.why_this_value ? ' ' + l.page_param_why + ': ' + line(p.why_this_value) : '')
   }
+  if (m.kind === 'removed') {
+    const x = n.removed[m.item]
+    return '- ' + at + '~~' + code(x.anchor) + '~~ (' + l.r_removed + '): ' + line(x.says)
+  }
   return '- ' + at + line(n.lines[m.item].says)
 }
 
@@ -85,11 +89,13 @@ function noteMd(ref: NoteRef, g: Group, where: Map<string, { path: string; at: n
   if (keep.marks) {
     const hidden = HIDDEN_AT[o.level] // what the level leaves out, as on the page
     const marks: Mark[] = []
-    const add = (kind: MarkKind, size: number) => { if (!hidden.includes(kind)) for (let item = 0; item < size; item++) marks.push({ kind, note: ref.id, item }) }
+    // a deleted line's comment shows and hides with the comments on lines
+    const add = (kind: MarkKind, size: number) => { if (!hidden.includes(kind === 'removed' ? 'line' : kind)) for (let item = 0; item < size; item++) marks.push({ kind, note: ref.id, item }) }
     add('symbol', n.symbols.length)
     add('use', n.uses.length)
     add('param', n.parameters.length)
     add('line', n.lines.length)
+    add('removed', n.removed.length)
     // in the order of the code: by file, then line; what found no line comes last
     const sorted = marks.map((m) => ({ m, w: where.get(markKey(m)) })).sort((a, b) =>
       (a.w ? 0 : 1) - (b.w ? 0 : 1) || (a.w?.path ?? '').localeCompare(b.w?.path ?? '') || (a.w?.at ?? 0) - (b.w?.at ?? 0))

@@ -113,7 +113,7 @@ function prose(n: Note): string[] {
   for (const s of n.symbols) out.push(s.why_exists, s.why_this_shape ?? '', s.called_by ?? '')
   for (const u of n.uses) out.push(u.why)
   for (const p of n.parameters) out.push(p.meaning, p.why_this_value ?? '')
-  for (const x of n.lines) out.push(x.says)
+  for (const x of [...n.lines, ...n.removed]) out.push(x.says)
   return out.map((t) => t.replace(/`[^`\n]*`/g, ' '))
 }
 

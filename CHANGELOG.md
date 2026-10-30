@@ -5,7 +5,8 @@
 The first version.
 
 - Notes before each change: the point in one line, what, why, new classes and functions and why
-  they exist, what is brought in from other files or libraries, parameters, line comments, risks.
+  they exist, what is brought in from other files or libraries, parameters, line comments,
+  comments on deleted lines, risks.
   Shown as cards in the transcript.
 - A recap when a task is done: overview, reading order, files by role, what to check by hand.
 - Capture of every edit with its diff, of commits made during the session, and of files changed

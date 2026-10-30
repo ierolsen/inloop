@@ -22,7 +22,7 @@ want, and in an ADHD-friendly form if you want.
   the note that explains that commit. Each commit has its own page too, with its reason first.
 - **Line by line.** Comments on the lines a reader would stop at, the class and function cards at
   the line that defines them, and what was imported from elsewhere at the import, with links
-  between files.
+  between files. Deleted lines get a comment too: why each one goes and what replaces it.
 - **Any commits, any time.** `/inloop review main..` for a branch, `/inloop review HEAD~10..` for
   the last ten commits, `/inloop review a1b2c3d` for one.
 - **The code as it stands.** `/inloop explain src/app.py` opens the same page on one file or
