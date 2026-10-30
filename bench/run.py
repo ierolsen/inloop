@@ -7,7 +7,7 @@ project's tests pass, and the notes inloop logged. The report compares every run
 against the run of the same task with inloop off.
 
 Usage:
-  python3 bench/run.py --data DIR --venv DIR [--tasks add-feature,fix-bug] [--modes off,guided,full]
+  python3 bench/run.py --data DIR --venv DIR [--tasks add-feature,fix-bug] [--modes off,summary,review,all]
                        [--repeats 1] [--concurrency 3] [--max-cost 4] [--name pilot] [--model MODEL]
 
 --data is a folder holding scikit-learn's California housing cache (cal_housing_py3.pkz), and
@@ -72,7 +72,8 @@ def prepare(task, fixture, mode, args):
     if mode != 'off':
         (work / '.inloop').mkdir()
         (work / '.inloop' / '.gitignore').write_text('*\n')
-        (work / '.inloop' / 'config.json').write_text(json.dumps({'language': 'en', 'level': mode}) + '\n')
+        # a mode is a tag or tags ("summary", "review+learn"); the levels of earlier versions still work
+        (work / '.inloop' / 'config.json').write_text(json.dumps({'language': 'en', 'tags': mode}) + '\n')
     return work, base
 
 

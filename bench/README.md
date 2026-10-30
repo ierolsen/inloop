@@ -22,7 +22,7 @@ they read.
 
 ## How it is measured
 
-`run.py` runs the same task from the same code with inloop off (not loaded) and at each level, and
+`run.py` runs the same task from the same code with inloop off (not loaded) and with each tag, and
 records:
 
 - from Claude Code (`claude -p --output-format json`): the cost at list price, input, cache and
@@ -36,7 +36,7 @@ every run with inloop on against the runs of the same task with inloop off.
 
 ```bash
 python3 bench/run.py --data <folder with cal_housing_py3.pkz> --venv <venv with pandas, scikit-learn, joblib, pytest> \
-  --modes off,guided,full --repeats 3 --name <name>
+  --modes off,summary,review,all --repeats 3 --name <name>
 ```
 
 Running it again with the same name resumes: runs that succeeded are kept. A run cut short by the
