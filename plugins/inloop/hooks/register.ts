@@ -210,8 +210,11 @@ async function loadSettings($: any) {
 // The note and recap tools as the session's tags shape them. Registered at the start and again
 // when the tags change, which rebuilds the prompt cache once.
 async function registerTools($: any) {
-  await $.tool.register(noteSpec(settings.tags.value))
-  await $.tool.register(recapSpec(settings.tags.value))
+  const note = noteSpec(settings.tags.value)
+  const recap = recapSpec(settings.tags.value)
+  // the names written out, so a reader of this file sees the tools the hooks below answer
+  await $.tool.register({ name: 'note', description: note.description, inputSchema: note.inputSchema })
+  await $.tool.register({ name: 'recap', description: recap.description, inputSchema: recap.inputSchema })
 }
 
 // Sets (or, with null, removes) one setting for this project or across projects, then reloads them.

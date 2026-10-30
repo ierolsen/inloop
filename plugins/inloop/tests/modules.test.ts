@@ -167,7 +167,9 @@ test('secrets are redacted and secret files are named only', async () => {
   expect(r.text).toContain('password = "' + REDACTED + '"')
   expect(r.text).toContain('port = 8080')
   expect(r.count).toBe(4)
-  expect(redact('api_key = process.env.API_KEY').count).toBe(0)
+  // a value that says where the secret is kept stays; a quoted or random one goes
+  for (const kept of ['api_key = settings.OPENAI_API_KEY', 'SECRET_KEY = config.DJANGO_SECRET', 'token = vault.read(', 'client_secret = cfg.secrets[']) expect([kept, redact(kept).count]).toEqual([kept, 0])
+  for (const gone of ['password = "settings.API_KEY"', 'token = abcdEFGH.ijklMNOP1234', 'api_key = a1b2c3d4e5f6g7h8.ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ']) expect([gone, redact(gone).count]).toEqual([gone, 1])
   expect(redact('-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----').text).toBe(REDACTED)
   expect(redactDeep({ a: ['sk-' + 'c'.repeat(30)], b: 2 })).toEqual({ value: { a: [REDACTED], b: 2 }, count: 1 })
   for (const p of ['.env', 'app/.env.local', 'id_rsa', 'server.pem', 'secrets.json', '.npmrc']) expect(sensitive(p)).toBe(true)

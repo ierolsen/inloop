@@ -21,12 +21,18 @@ const TOKENS: RegExp[] = [
 // `password = "..."`, `api_key: '...'`, `AWS_SECRET_ACCESS_KEY=...`: the name stays, the value goes
 const ASSIGNMENT = /\b([A-Za-z0-9_.-]*(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret)[A-Za-z0-9_.-]*)(\s*[:=]\s*)(["']?)([^\s"'`,;]{8,})\3/gi
 
+// An unquoted value that says where a secret is kept instead of holding it: a path of identifiers
+// that ends in a constant's name (settings.API_KEY, config.STRIPE_SECRET) or opens a lookup
+// (vault.read(, cfg.secrets[). Secrets are long random strings, so no part may be longer than an
+// identifier usually is; a quoted value is a literal and always goes.
+const REFERENCE = /^[A-Za-z_]\w{0,31}(?:\.[A-Za-z_]\w{0,31})*(?:\.[A-Z][A-Z0-9_]{0,31}|[[(])$/
+
 export function redact(text: string): { text: string; count: number } {
   let count = 0
   let out = text
   for (const pattern of TOKENS) out = out.replace(pattern, () => { count++; return REDACTED })
   out = out.replace(ASSIGNMENT, (whole, name: string, eq: string, quote: string, value: string) => {
-    if (value === REDACTED || /^(true|false|null|none|undefined|\$\{?[A-Za-z_]+\}?|process\.env\.[A-Za-z_]+|os\.environ.*)$/i.test(value)) return whole
+    if (value === REDACTED || /^(true|false|null|none|undefined)$/i.test(value) || (!quote && REFERENCE.test(value))) return whole
     count++
     return name + eq + quote + REDACTED + quote
   })

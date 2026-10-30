@@ -13,7 +13,7 @@ export type Segment = { from: number; to: number; marks: Mark[] } // lines from.
 
 // Quoted code is compared without any whitespace: Claude may copy a line with other spacing
 const bare = (text: string) => text.replace(/\s+/g, '')
-const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const escapeRe = (text: string) => text.replace(/[.*+?^(){}|[\]\\$]/g, '\\$&')
 const word = (name: string) => new RegExp('(^|[^\\w$])' + escapeRe(name) + '($|[^\\w$])')
 const DEF = 'class|def|function|func|fn|interface|type|struct|enum|trait|impl|module|object|record|const|let|var|async\\s+def|async\\s+function|export\\s+(?:default\\s+)?(?:async\\s+)?function|export\\s+(?:const|class|interface|type|enum)'
 

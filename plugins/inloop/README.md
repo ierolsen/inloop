@@ -76,8 +76,7 @@ Nothing, unless you ask for it:
 inloop reads no credentials and no environment variables; `gh` and `git` use their own logins.
 It sends nothing from the conversation anywhere: it reads Claude's tool calls to record what
 changed, counts the notes and edits when a turn ends, and keeps all of it on your disk. Secrets
-are redacted before anything is written; the redaction code mentions forms such as
-`process.env.NAME` only to recognize such placeholders and leave them as they are.
+are redacted before anything is written.
 
 ### Hooks, and what each one changes
 

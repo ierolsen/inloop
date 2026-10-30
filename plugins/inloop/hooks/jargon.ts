@@ -142,7 +142,7 @@ function literalsIn(texts: string[], code: string | null): Found[] {
   for (const text of texts) {
     let low = g.lower(text)
     for (const lit of g.literals) {
-      const at = new RegExp('(^|[^\\p{L}])' + lit.stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\p{L}*', 'u').exec(low)
+      const at = new RegExp('(^|[^\\p{L}])' + lit.stem.replace(/[.*+?^(){}|[\]\\$]/g, '\\$&') + '\\p{L}*', 'u').exec(low)
       if (!at) continue
       const from = at.index + at[1].length
       const said = at[0].slice(at[1].length)

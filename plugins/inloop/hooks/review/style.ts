@@ -34,13 +34,13 @@ const noGloss = MARK_PARTS.map((p) => '[data-hide~="' + p + '"]').join('')
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace'
 
 export const CSS = `
-:root {${LIGHT} }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {${DARK} } }
-:root[data-theme="dark"] {${DARK} }
+:root {` + LIGHT + ` }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {` + DARK + ` } }
+:root[data-theme="dark"] {` + DARK + ` }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-code, .src, .mono, .sha, .delta, kbd { font-family: ${MONO}; }
+code, .src, .mono, .sha, .delta, kbd { font-family: ` + MONO + `; }
 a { color: var(--accent); text-underline-offset: 2px; }
 p { margin: 0 0 10px; }
 h1 { font-size: 28px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; overflow-wrap: anywhere; text-wrap: balance; }
@@ -91,8 +91,8 @@ ul.tags-list .n { font-weight: 650; }
 ul.tags-list .badge { justify-self: end; }
 ul.tags-list .d { grid-column: 1 / -1; color: var(--muted); font-size: 13.5px; }
 ul.tags-list .g { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; }
-ul.tags-list .g code { font-family: ${MONO}; font-size: 12px; background: var(--code-line); border-radius: 4px; padding: 1px 5px; color: var(--ink); }
-ul.tags-list .n { font-family: ${MONO}; font-size: 14px; }
+ul.tags-list .g code { font-family: ` + MONO + `; font-size: 12px; background: var(--code-line); border-radius: 4px; padding: 1px 5px; color: var(--ink); }
+ul.tags-list .n { font-family: ` + MONO + `; font-size: 14px; }
 ul.tags-list button[aria-pressed="true"] .n::before { content: "\\2713  "; color: var(--accent); }
 .drawer-btn, .drawer-close { display: none; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; background: var(--panel); }
 .drawer-toggle { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
@@ -140,7 +140,7 @@ ul.tree li.leaf > a:hover, ul.tree summary:hover { background: var(--accent-soft
 ul.tree li.leaf > a[aria-current] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 ul.tree li.unx > a { color: var(--muted); }
 .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.st { margin-left: auto; font-family: ${MONO}; font-size: 11px; font-weight: 700; flex: none; }
+.st { margin-left: auto; font-family: ` + MONO + `; font-size: 11px; font-weight: 700; flex: none; }
 .st-added { color: var(--add-ink); } .st-modified { color: var(--warn-ink); } .st-deleted { color: var(--del-ink); } .st-renamed { color: var(--f); }
 .nn { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 6px; flex: none; font-variant-numeric: tabular-nums; }
 .st + .nn { margin-left: 4px; }
@@ -231,7 +231,7 @@ nav.tabs .count { font-size: 12px; background: var(--code-line); border-radius: 
 .cnav { display: flex; justify-content: space-between; gap: 8px; margin: 0 0 16px; font-size: 14px; }
 .eyebrow { color: var(--accent); font-weight: 650; font-size: 14px; margin: 0 0 4px; }
 .eyebrow .sha { color: var(--accent); }
-.subject { font-family: ${MONO}; font-size: 14px; color: var(--muted); margin: 0 0 14px; overflow-wrap: anywhere; }
+.subject { font-family: ` + MONO + `; font-size: 14px; color: var(--muted); margin: 0 0 14px; overflow-wrap: anywhere; }
 .body { color: var(--muted); font-size: 14.5px; border-left: 3px solid var(--line); padding: 2px 0 2px 12px; margin: 0 0 18px; max-width: 80ch; }
 .pending-head { background: var(--warn); border-radius: 12px; padding: 16px 20px; margin-bottom: 22px; }
 .pending-head h2 { color: var(--warn-ink); margin-bottom: 4px; }
@@ -256,7 +256,7 @@ ul.changed .st { margin-left: 0; width: 12px; }
 .badge.new { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
 .badge.warn { border-color: transparent; background: var(--warn); color: var(--warn-ink); }
 dl.terms { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 15px; }
-dl.terms dt { font-weight: 650; font-family: ${MONO}; font-size: 13.5px; padding-top: 2px; color: var(--ink); overflow-wrap: anywhere; }
+dl.terms dt { font-weight: 650; font-family: ` + MONO + `; font-size: 13.5px; padding-top: 2px; color: var(--ink); overflow-wrap: anywhere; }
 dl.terms dd { margin: 0; min-width: 0; }
 .story dd.outcome { background: var(--outcome); border-left: 3px solid var(--outcome-line); padding: 6px 12px; border-radius: 0 6px 6px 0; }
 .why-box, .outcome-box { font-size: 14.5px; border-radius: 0 6px 6px 0; padding: 6px 12px; margin: 0 0 8px; max-width: 900px; }
@@ -333,10 +333,10 @@ table.index td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; 
 footer { color: var(--faint); font-size: 13px; border-top: 1px solid var(--line); margin-top: 48px; padding-top: 16px; }
 
 /* the parts the reader's tags leave out; with no explanation beside a line left, the code takes the width */
-${hiding}
-${noGloss} .rows { grid-template-columns: minmax(0, 1fr); }
-${noGloss} .rows > .gloss { display: none; }
-${noGloss} .rows > .src { border-top: 0; }
+` + hiding + `
+` + noGloss + ` .rows { grid-template-columns: minmax(0, 1fr); }
+` + noGloss + ` .rows > .gloss { display: none; }
+` + noGloss + ` .rows > .src { border-top: 0; }
 
 @media (max-width: 1100px) {
   /* minmax(0, ...): a long line of code scrolls inside its block instead of widening the page */
@@ -394,7 +394,7 @@ ${noGloss} .rows > .src { border-top: 0; }
 `
 
 // The view the page opens on when the address names none: drawn by CSS, so it needs no script
-export const startCss = (id: string) => `body:not(:has(:target)) #${id} { display: block; }\n`
+export const startCss = (id: string) => 'body:not(:has(:target)) #' + id + ' { display: block; }\n'
 
 // Search, keys, the tag and theme switches, printing, and the tree following the view. The page
 // reads the same without it: every view opens through its #anchor.

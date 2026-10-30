@@ -154,22 +154,22 @@ type Open = { id: string; files: string[] }
 // Which note an edit belongs to. Notes are kept per agent (the main conversation and each subagent
 // separately) and per turn of the main conversation: a new prompt starts with no open note.
 export class Pairing {
-  private open = new Map<string, Open[]>()
+  private waiting = new Map<string, Open[]>()
 
   newTurn() {
-    this.open.clear()
+    this.waiting.clear()
   }
 
   addNote(agent: string, id: string, files: string[]) {
-    const list = this.open.get(agent) ?? []
+    const list = this.waiting.get(agent) ?? []
     list.push({ id, files })
-    this.open.set(agent, list)
+    this.waiting.set(agent, list)
   }
 
   // The newest note of this agent that lists the file; else the agent's newest note, with `listed`
   // false because the note did not name the file; else none.
   match(agent: string, file: string): { id: string; listed: boolean } | null {
-    const list = this.open.get(agent) ?? []
+    const list = this.waiting.get(agent) ?? []
     for (let i = list.length - 1; i >= 0; i--) {
       if (list[i].files.some((f) => sameFile(f, file))) return { id: list[i].id, listed: true }
     }

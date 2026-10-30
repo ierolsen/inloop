@@ -67,7 +67,8 @@ already having, so they go wherever that conversation goes.
 - Before anything is written, inloop redacts values that look like secrets: private key blocks,
   GitHub, GitLab, Slack, Stripe, AWS, Google, npm and Hugging Face tokens, `sk-` style API keys,
   JSON web tokens, and assignments such as `password = "..."` or `API_KEY=...`. The name stays;
-  the value becomes `[redacted]`.
+  the value becomes `[redacted]`. An unquoted value that only says where the secret is kept, such
+  as `settings.API_KEY` or `vault.read(`, stays, since it holds no secret.
 - Files that usually hold secrets (`.env` and its variants except examples, `*.pem`, `*.key`,
   `id_rsa` and friends, `credentials`, `secrets.*`, `.npmrc`, `.netrc`) are recorded by name only:
   their content is never read into the record or onto the page.
