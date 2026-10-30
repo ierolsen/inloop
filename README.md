@@ -6,8 +6,8 @@ inloop is a Claude Code plugin. Before each change, Claude explains it in a shor
 note: the point in one line, what the change does, why, why each new class or function exists,
 what it brings in from other files or libraries, and the parameters that matter. You read the
 notes live while Claude works, and afterwards in your browser, browsing the code like a repository
-with every explanation next to the line it explains. In your language, at the level of detail you
-want, and in an ADHD-friendly form if you want.
+with every explanation next to the line it explains. In your language, holding only what you
+need it for, and in an ADHD-friendly form if you want.
 
 ![The review: a file's code with its explanations beside it, the project's files on the side](docs/review.png)
 
@@ -45,10 +45,13 @@ want, and in an ADHD-friendly form if you want.
   point to its end, then a guide with the files to read in order, how to run and test it, its
   conventions, questions to check yourself, and first tasks. `/inloop onboard` keeps explaining
   every later change for a newcomer.
-- **Six levels of detail.** From `onboarding` (every line, and where it sits in the codebase) and
-  `full` (nearly every line explained, every term defined) through `guided`, `essentials` and
-  `design` to `big-picture` (architecture and consequences only). On the page, a dialog switches
-  to a higher level to hide detail.
+- **Tags decide what the notes hold, and what they cost.** `summary` (the point, what and why)
+  costs least; `review` (default: what a reviewer needs) adds why new code exists, why lines were
+  deleted, risks and rejected options; `learn` explains line by line with the terms and
+  parameters; `decisions` the trade-offs; `architecture` the system-level consequences;
+  `onboarding` is `learn` plus where the code sits; `all` is everything. Tags combine
+  (`/inloop tags review,learn`), and Claude is asked for and offered only the fields they name.
+  On the page, a dialog turns tags off to hide parts.
 - **Technical words stay technical.** A note in Turkish says "satırları shuffle edip split eder"
   and "random_state ile reproducible", as Turkish developers do, never a word-for-word translation,
   and explains the terms in a glossary. A note that slips is sent back once to be reworded.
@@ -92,15 +95,16 @@ To try it in one session without installing, clone this repository and run
 | `/inloop:onboard [folder]` | Claude walks a newcomer through the codebase, with a guide to it |
 | `/inloop onboard` | Notes in this project explain for someone new to the codebase |
 | `/inloop lang <language>` | The language of the notes, for all your projects (`--project` for this one) |
-| `/inloop level <level>` | How the notes explain: `onboarding`, `full`, `guided`, `essentials`, `design` or `big-picture` |
+| `/inloop tags <tag,...>` | What the notes hold: `summary`, `review`, `learn`, `decisions`, `architecture`, `onboarding`, `all` |
 | `/inloop adhd on` | The ADHD-friendly form; `off` to go back |
 | `/inloop on`, `/inloop off` | Ask Claude for notes in this session, or stop |
 | `/inloop status` | What was recorded, and which settings are in effect |
 
-The language, the level and the ADHD form can also be set in `/config`. A project's own choice
-comes first, then yours across projects, then the plugin setting.
+The language, the tags and the ADHD form can also be set in `/config`. A project's own choice
+comes first, then yours across projects, then the plugin setting. Tag names are English in every
+language; `/inloop level` and the level names of earlier versions still work.
 
-On the page, `t` jumps to "Go to file", the level dialog hides detail, the glossary lists every
+On the page, `t` jumps to "Go to file", the tag dialog hides parts, the glossary lists every
 term the notes explain, and "Everything as PDF" prints every commit (or, for `/inloop explain`,
 every file) in one go.
 
@@ -121,7 +125,7 @@ inloop's own code makes no network requests and no model calls. The pull request
 your own tools: `/inloop review pr` and `/inloop share pr` read the pull request with `gh` and
 `git fetch`, and only `/inloop share pr --yes`, typed by you at Claude Code's prompt, posts
 anything, as you, with your own `gh` login. The notes are written by Claude in your session, so they cost output tokens;
-`/inloop level essentials` or `/inloop off` keep that down. Secrets are redacted before anything is written, and files that usually hold secrets, such
+`/inloop tags summary` or `/inloop off` keep that down; [bench/](bench/) measures by how much. Secrets are redacted before anything is written, and files that usually hold secrets, such
 as `.env` files and keys, are recorded by name only. The review page is a single file that loads
 nothing from the internet; it holds the code of the files it covers, so share it only with people
 who may see that code. See [docs/privacy.md](docs/privacy.md).

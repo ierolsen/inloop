@@ -1,7 +1,8 @@
 // Unit tests of inloop's plain modules: no events, no mods API.
 import { expect, test } from 'claude-code/testing'
-import { language, resolve, level, languageName, fold } from '../hooks/config.ts'
-import { instructions } from '../hooks/instructions.ts'
+import { language, resolve, tags, languageName, fold } from '../hooks/config.ts'
+import { instructions, noteSpec, recapSpec, NOTE_SPEC } from '../hooks/instructions.ts'
+import { partsOf, tagsCovered } from '../hooks/parts.ts'
 import { cleanNote, cleanRecap, relative, inside, sameFile, Pairing } from '../hooks/note.ts'
 import { diff, lines, isBinary } from '../hooks/diff.ts'
 import { redact, redactDeep, sensitive, REDACTED } from '../hooks/redact.ts'
@@ -22,41 +23,57 @@ test('a language is found by code, English name, native name or another spelling
 })
 
 test('settings come from the project, then the user, then the plugin, then the default', async () => {
-  expect(resolve({})).toEqual({ language: { code: 'en', english: 'English', native: 'English', source: 'default' }, level: { value: 'guided', source: 'default' }, adhd: { value: false, source: 'default' } })
+  expect(resolve({})).toEqual({ language: { code: 'en', english: 'English', native: 'English', source: 'default' }, tags: { value: ['review'], source: 'default' }, adhd: { value: false, source: 'default' } })
   expect(resolve({ project: { adhd: 'on' }, user: { adhd: false } }).adhd).toEqual({ value: true, source: 'project' })
   expect(resolve({ user: { adhd: false }, plugin: { adhd: 'on' } }).adhd).toEqual({ value: false, source: 'user' })
-  // a layer may still hold the first builds' "detail"; "level" wins where both are set
-  const s = resolve({ project: { detail: 'deep' }, user: { language: 'tr', level: 'design', detail: 'brief' }, plugin: { language: 'German', level: 'guided' } })
+  // a layer may still hold the "level" or "detail" of an earlier version; "tags" wins where set
+  const s = resolve({ project: { detail: 'deep' }, user: { language: 'tr', level: 'design', detail: 'brief' }, plugin: { language: 'German', tags: 'summary' } })
   expect(s.language.code).toBe('tr')
   expect(s.language.source).toBe('user')
-  expect(s.level).toEqual({ value: 'full', source: 'project' })
-  expect(resolve({ user: { level: 'design', detail: 'brief' } }).level).toEqual({ value: 'design', source: 'user' })
+  expect(s.tags).toEqual({ value: ['all'], source: 'project' })
+  expect(resolve({ user: { tags: 'learn', level: 'design' } }).tags).toEqual({ value: ['learn'], source: 'user' })
   expect(resolve({ project: { language: 'nl' }, user: { language: 'tr' } }).language.source).toBe('project')
-  expect(resolve({ plugin: { language: '', level: 'loud' } })).toEqual(resolve({}))
-  expect(['FULL', 'big picture', 'Big-Picture', 'standard', 'brief', 'deep', 'key points'].map(level)).toEqual(['full', 'big-picture', 'big-picture', 'guided', 'essentials', 'full', 'essentials'])
-  expect(level('loud')).toBe(null)
+  expect(resolve({ plugin: { language: '', tags: 'loud' } })).toEqual(resolve({}))
+  // tags combine in any spelling, keep their own order, and "all" covers the rest
+  expect(tags('learn, Review')).toEqual(['review', 'learn'])
+  expect(tags('review+decisions')).toEqual(['review', 'decisions'])
+  expect(tags(['architecture', 'summary'])).toEqual(['summary', 'architecture'])
+  expect(tags('review, all')).toEqual(['all'])
+  expect(['full', 'big picture', 'Big-Picture', 'standard', 'brief', 'deep', 'key points', 'design', 'onboard'].map((x) => tags(x)?.join(','))).toEqual(
+    ['all', 'architecture', 'architecture', 'review,learn', 'review', 'all', 'review', 'decisions', 'onboarding'])
+  expect(tags('loud')).toBe(null)
+  expect(tags('review, loud')).toBe(null)
+  expect(tags('review learn')).toEqual(['review', 'learn'])
+  expect(tags('')).toBe(null)
   expect(languageName(language('tr')!)).toBe('Turkish (Türkçe)')
   expect(languageName(language('en')!)).toBe('English')
 })
 
-test('the instructions name the language, the level and the terminology rule, and depend only on them', async () => {
-  const tr = instructions('inloop', language('tr')!, 'full')
+test('the instructions name the language, the tags and the terminology rule, and depend only on them', async () => {
+  const tr = instructions('inloop', language('tr')!, ['all'])
   expect(tr).toContain('mcp__inloop__note')
   expect(tr).toContain('mcp__inloop__recap')
   expect(tr).toContain('Turkish (Türkçe)')
-  expect(instructions('inloop', language('tr')!, 'full')).toBe(tr)
+  expect(instructions('inloop', language('tr')!, ['all'])).toBe(tr)
   expect(tr).toContain('Never replace a technical word with an everyday Turkish paraphrase or a word-for-word translation')
   expect(tr).toContain('not "rastgele ve tekrarlanabilir bölme"')
-  expect(instructions('inloop', language('de')!, 'full')).toContain('not "Zufallssamen"')
+  expect(instructions('inloop', language('de')!, ['all'])).toContain('not "Zufallssamen"')
   // a language inloop has no examples for gets the rule alone
-  const fr = instructions('inloop', language('fr')!, 'full')
+  const fr = instructions('inloop', language('fr')!, ['all'])
   expect(fr).toContain('Never replace a technical word with an everyday French paraphrase')
   expect(fr).not.toContain('In Turkish')
   expect(fr).not.toContain('In German')
-  expect(tr).toContain('Add to `terms` every technical term')
-  expect(instructions('inloop', language('de')!, 'big-picture')).toContain('leave `lines`, `removed`, `parameters` and `terms` empty')
-  expect(tr).toContain('`removed` does the same for lines you delete')
-  expect(instructions('inloop', language('de')!, 'design')).toContain('fill `impact`')
+  expect(tr).toContain('every technical term, abbreviation and formula in `terms`')
+  expect(tr).toContain('`removed` comments on lines you delete')
+  // each tag asks only for its own parts
+  const summary = instructions('inloop', language('en')!, ['summary'])
+  expect(summary).toContain('Tag "summary": keep each note to `tldr`, `what` and `why`')
+  for (const part of ['`lines` are comments', '`removed` comments', '`terms` explains', '`parameters` explains', 'add it to `symbols`', 'add it to `uses`']) expect(summary, part).not.toContain(part)
+  expect(summary).toContain("call `mcp__inloop__recap` once: an overview, what the user should check by hand (`check_by_hand`), what you learned after a note's change")
+  const decisions = instructions('inloop', language('de')!, ['decisions'])
+  expect(decisions).toContain('fill `impact`')
+  expect(decisions).not.toContain('`lines` are comments')
+  expect(instructions('inloop', language('en')!, ['architecture'])).not.toContain('`terms` explains')
   expect(tr).not.toContain('\u2014')
 })
 
@@ -222,8 +239,18 @@ test('a recap carries outcomes and an onboarding guide; one an earlier inloop wr
   expect([back.recap.outcomes, back.recap.setup, back.recap.questions, back.recap.overview]).toEqual([[], [], [], 'Earlier.'])
 })
 
-test('the onboarding level is the most detailed, and is found by its other names', async () => {
-  expect(level('onboard')).toBe('onboarding')
-  expect(level('Onboarding')).toBe('onboarding')
-  expect(resolve({ project: { level: 'onboarding' } }).level).toEqual({ value: 'onboarding', source: 'project' })
+test('each tag names the parts of a note it asks for; the tools describe those in full and the rest in one line', async () => {
+  expect(partsOf(['summary']).note).toEqual([])
+  expect(partsOf(['review']).note).toEqual(['lines', 'removed', 'symbols', 'alternatives', 'impact', 'risks'])
+  expect(partsOf(['review', 'learn']).note).toEqual(['lines', 'removed', 'symbols', 'uses', 'parameters', 'terms', 'alternatives', 'impact', 'risks'])
+  expect(partsOf(['onboarding']).recap).toContain('questions')
+  expect(tagsCovered(['impact', 'risks'])).toEqual(['summary', 'architecture'])
+  // the summary tool keeps every field, so a skill can still fill them, but describes them in one line
+  const summary = noteSpec(['summary']).inputSchema.properties as any
+  expect(Object.keys(summary)).toEqual(Object.keys(NOTE_SPEC.inputSchema.properties))
+  expect(summary.terms).toEqual({ type: 'array', description: 'Only when an inloop skill asks.', items: { type: 'object' } })
+  expect((noteSpec(['learn']).inputSchema.properties as any).terms.items.properties.term).toBeDefined()
+  expect(JSON.stringify(noteSpec(['summary'])).length).toBeLessThan(JSON.stringify(noteSpec(['all'])).length * 0.5)
+  expect((recapSpec(['summary']).inputSchema.properties as any).setup.description).toBe('Only when an inloop skill asks.')
+  expect(recapSpec(['summary']).inputSchema.required).toEqual(['overview'])
 })

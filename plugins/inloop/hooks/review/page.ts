@@ -2,12 +2,13 @@
 // in a tree beside one view at a time: the overview, a folder, a file's code with its explanations,
 // the file's changes commit by commit, why each block of its lines is there, or one commit with its
 // notes. Every view is drawn in advance and shown by the address's #anchor, so the page works
-// without its script; the script adds search, keys, and the level and theme switches. Plain module.
+// without its script; the script adds search, keys, and the tag and theme switches. Plain module.
 
 import type { Labels } from '../i18n/en.ts'
 import { count, say } from '../i18n/index.ts'
 import { bytes } from '../log.ts'
-import { LEVELS, type Level } from '../config.ts'
+import { TAGS, type Tag } from '../config.ts'
+import { PARTS_OF } from '../parts.ts'
 import { sameFile } from '../note.ts'
 import { esc, span, rich, when, shell, type Theme } from './html.ts'
 import { highlight, languageOf } from './highlight.ts'
@@ -20,9 +21,9 @@ import { folders, fileId, dirId, covers, UNCOMMITTED, type Explorer, type FilePa
 
 export const PAGE_BYTES = 3_800_000 // under the 4 MiB a mod may write in one file
 export type Mode = 'review' | 'explain'
-// level: the level the page opens at; written: whether the logs say the notes were written at it;
+// tags: the tags the page opens with; written: whether the logs say the notes were written with them;
 // command and made: the command that wrote the page and when, for its footer
-export type Options = { code: string | null; theme: Theme; version: string; level: Level; written: boolean; mode: Mode; start: string | null; command: string; made: number }
+export type Options = { code: string | null; theme: Theme; version: string; tags: Tag[]; written: boolean; mode: Mode; start: string | null; command: string; made: number }
 // What fit() has left out so far: the diffs under each file's Changes tab, then the code beside
 // the why view's commits. Both stay on the page elsewhere.
 export type Trim = { changes: boolean; why: boolean }
@@ -52,8 +53,8 @@ const delta = (a: number, r: number) => '<span class="delta"><span class="plus">
 const sum = (g: Group) => g.files.reduce((t, f) => [t[0] + f.data.patch.added, t[1] + f.data.patch.removed], [0, 0])
 const short = (sha: string | null) => (sha ?? '').slice(0, 7)
 const hint = (text: string) => '<p class="hint">' + span(text) + '</p>'
-const levelName = (l: Labels, v: Level) => l[('level_' + v.replace('-', '_')) as 'level_full']
-const lv = (kind: MarkKind) => 'lv-' + (kind === 'symbol' ? 'symbol' : kind === 'use' ? 'use' : kind === 'param' ? 'param' : 'line')
+// the part of a note an explanation belongs to, as the tag chooser hides it
+const lv = (kind: MarkKind) => 'lv-' + ({ symbol: 'symbols', use: 'uses', param: 'parameters', line: 'lines', removed: 'removed' } as const)[kind]
 const kindOfKey = (key: string) => key.split(':').slice(-2)[0] as MarkKind
 const statusMark = (s: Status | null, l: Labels) => (s ? '<span class="st st-' + s + '" title="' + esc(l[('x_status_' + s) as 'x_status_added']) + '">' + LETTER[s] + '</span>' : '')
 const notesPill = (n: number, c: Ctx) => '<span class="nn" title="' + esc(count(c.code, c.l.notes, n)) + '">' + n + '</span>'
@@ -206,9 +207,9 @@ function notesHtml(g: Group, c: Ctx): string {
     if (n.what) out.push('<dt>' + esc(l.page_what) + '</dt><dd class="rich">' + rich(n.what) + '</dd>')
     if (n.why) out.push('<dt>' + esc(l.page_why) + '</dt><dd class="why rich">' + rich(n.why) + basis + tags + '</dd>')
     if (ref.outcomes.length) out.push('<dt>' + esc(l.r_outcome) + '</dt><dd class="outcome rich">' + list(ref.outcomes) + '</dd>')
-    if (n.alternatives.length) out.push('<dt>' + esc(l.r_instead) + '</dt><dd class="rich">' + list(n.alternatives) + '</dd>')
-    if (n.impact.length) out.push('<dt>' + esc(l.r_impact) + '</dt><dd class="rich">' + list(n.impact) + '</dd>')
-    if (n.risks.length) out.push('<dt>' + esc(l.page_risks) + '</dt><dd class="risk rich">' + list(n.risks) + '</dd>')
+    if (n.alternatives.length) out.push('<dt class="lv-alternatives">' + esc(l.r_instead) + '</dt><dd class="lv-alternatives rich">' + list(n.alternatives) + '</dd>')
+    if (n.impact.length) out.push('<dt class="lv-impact">' + esc(l.r_impact) + '</dt><dd class="lv-impact rich">' + list(n.impact) + '</dd>')
+    if (n.risks.length) out.push('<dt class="lv-risks">' + esc(l.page_risks) + '</dt><dd class="lv-risks risk rich">' + list(n.risks) + '</dd>')
     if (n.terms.length) {
       out.push('<dt class="lv-terms">' + esc(l.r_terms) + '</dt><dd class="lv-terms"><dl class="terms">' + n.terms.map((t) => '<dt>' + esc(t.term) + '</dt><dd class="rich">' + rich(t.means) + '</dd>').join('') + '</dl></dd>')
     }
@@ -496,22 +497,23 @@ function appbar(c: Ctx): string {
   const { r, l, o } = c
   const theme = '<span class="seg" role="group" aria-label="' + esc(l.r_theme) + '">' + (['auto', 'light', 'dark'] as const).map((t) =>
     '<button type="button" data-theme-choice="' + t + '">' + esc(l[('r_theme_' + t) as 'r_theme_auto']) + '</button>').join('') + '</span>'
-  const level = '<button type="button" class="lvl-btn" data-level-open aria-haspopup="dialog"><span class="k">' + esc(l.x_level) + ':</span> <span class="v" data-level-name>' +
-    esc(levelName(l, o.level)) + '</span><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
+  const chooser = '<button type="button" class="tags-btn" data-tags-open aria-haspopup="dialog"><span class="k">' + esc(l.x_tags) + ':</span> <span class="v" data-tags-name>' +
+    esc(o.tags.join(', ')) + '</span><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
   return '<header class="appbar"><label class="drawer-btn" for="drawer">' + ICON_MENU + '<span class="t">' + esc(l.x_files) + '</span></label><div class="brand"><a class="logo" href="#overview">inloop</a><span class="mode">' +
-    esc(o.mode === 'explain' ? l.x_explain : l.x_review) + '</span><span class="proj">' + esc(r.project) + '</span></div><div class="tools">' + level + theme +
+    esc(o.mode === 'explain' ? l.x_explain : l.x_review) + '</span><span class="proj">' + esc(r.project) + '</span></div><div class="tools">' + chooser + theme +
     '<button type="button" data-print>' + esc(l.r_print) + '</button><button type="button" data-print-all>' + esc(l.x_print_all) + '</button></div></header>'
 }
 
-// The levels to choose from, each with what it shows; the notes' own level is marked. Choosing one
-// hides what it leaves out, it never adds what the notes do not hold.
-function levelDialog(c: Ctx): string {
+// The tags to choose from, each with what it adds; the tags the notes were written with are marked
+// and pressed. Turning tags off hides parts; turning one on shows only what the notes hold.
+function tagsDialog(c: Ctx): string {
   const { l, o } = c
-  const items = LEVELS.map((v) => '<li><button type="button" data-level-choice="' + v + '" aria-pressed="' + String(v === o.level) + '"><span class="n">' + esc(levelName(l, v)) + '</span>' +
-    (o.written && v === o.level ? badge(l.x_level_written, 'new') : '') + '<span class="d">' + esc(l[('x_level_desc_' + v.replace('-', '_')) as 'x_level_desc_full']) + '</span></button></li>')
-  return '\n<dialog class="lvl-modal" id="levels" aria-labelledby="levels-title"><div class="lvl-in"><div class="lvl-head"><h2 id="levels-title">' + esc(l.x_level_title) + '</h2>' +
-    '<button type="button" class="x" data-level-close aria-label="' + esc(l.x_close) + '">&times;</button></div>' + hint(say(o.written ? l.x_level_hint : l.x_level_hint_setting, { level: levelName(l, o.level) })) +
-    '<ul class="lvl-list">' + items.join('') + '</ul></div></dialog>'
+  const parts = Object.fromEntries(TAGS.map((t) => [t, PARTS_OF[t].note]))
+  const items = TAGS.map((t) => '<li><button type="button" data-tag-choice="' + t + '" aria-pressed="' + String(o.tags.includes(t)) + '"><span class="n">' + t + '</span>' +
+    (o.written && o.tags.includes(t) ? badge(l.x_tags_written, 'new') : '') + '<span class="d">' + esc(l[('tag_desc_' + t) as 'tag_desc_review']) + '</span></button></li>')
+  return '\n<dialog class="tags-modal" id="tags" aria-labelledby="tags-title" data-parts="' + esc(JSON.stringify(parts)) + '"><div class="tags-in"><div class="tags-head"><h2 id="tags-title">' + esc(l.x_tags_title) + '</h2>' +
+    '<button type="button" class="x" data-tags-close aria-label="' + esc(l.x_close) + '">&times;</button></div>' + hint(say(o.written ? l.x_tags_hint : l.x_tags_hint_setting, { tags: o.tags.join(', ') })) +
+    '<ul class="tags-list">' + items.join('') + '</ul></div></dialog>'
 }
 
 // The tree: folders open, a folder holding only one folder shown as one line (as GitHub does)
@@ -597,9 +599,9 @@ export function render(r: Review, x: Explorer, l: Labels, o: Options, trim: Trim
   const known = (id: string) => id === 'overview' || id === 'd-root' || id === 'glossary' || shown.has(id) || x.files.some((p) => p.id === id) || (id.startsWith('d-') && folders(x.root).some((n) => dirId(n.path) === id))
   const start = o.start && known(o.start) ? o.start : 'overview'
   const foot = '<footer>inloop ' + esc(o.version) + ' &middot; <code>' + esc(o.command) + '</code> &middot; ' + esc(when(o.made, o.code)) + '</footer>'
-  const body = appbar(c) + levelDialog(c) + '\n<input type="checkbox" id="drawer" class="drawer-toggle" aria-hidden="true" tabindex="-1"><label class="scrim" for="drawer" aria-hidden="true"></label>\n<div class="app">' + sidebar(c) +
+  const body = appbar(c) + tagsDialog(c) + '\n<input type="checkbox" id="drawer" class="drawer-toggle" aria-hidden="true" tabindex="-1"><label class="scrim" for="drawer" aria-hidden="true"></label>\n<div class="app">' + sidebar(c) +
     '<main class="views">\n' + views.filter(Boolean).join('\n') + '\n' + foot + '</main></div>'
-  return shell(say(l.page_title, { project: r.project || 'inloop' }), o.code, o.theme, CSS + startCss(start), body, SCRIPT, { 'data-level': o.level, 'data-start': start })
+  return shell(say(l.page_title, { project: r.project || 'inloop' }), o.code, o.theme, CSS + startCss(start), body, SCRIPT, { 'data-tags': o.tags.join(','), 'data-start': start })
 }
 
 // The page within the size a mod may write. What goes first is what the page shows twice: the

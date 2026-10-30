@@ -1,8 +1,8 @@
 // inloop's hooks module: the only file that calls the mods API. Every other module under hooks/ is
 // plain code that takes values and returns values (see CLAUDE.md).
 
-import { resolve, language as parseLanguage, level as parseLevel, adhd as parseAdhd, languageName, type Settings } from './config.ts'
-import { instructions, NOTE_SPEC, RECAP_SPEC } from './instructions.ts'
+import { resolve, language as parseLanguage, tags as parseTags, adhd as parseAdhd, languageName, TAGS, type Settings, type Tag } from './config.ts'
+import { instructions, noteSpec, recapSpec } from './instructions.ts'
 import { cleanNote, cleanRecap, relative, inside, sameFile, Pairing } from './note.ts'
 import { diff, isBinary } from './diff.ts'
 import { redact, redactDeep, sensitive } from './redact.ts'
@@ -203,13 +203,20 @@ async function readUser($: any): Promise<Record<string, unknown>> {
 
 async function loadSettings($: any) {
   settings = resolve({ project: await readProject($), user: await readUser($), plugin: options })
-  prompt = instructions(PLUGIN, settings.language, settings.level.value, settings.adhd.value)
+  prompt = instructions(PLUGIN, settings.language, settings.tags.value, settings.adhd.value)
+}
+
+// The note and recap tools as the session's tags shape them. Registered at the start and again
+// when the tags change, which rebuilds the prompt cache once.
+async function registerTools($: any) {
+  await $.tool.register(noteSpec(settings.tags.value))
+  await $.tool.register(recapSpec(settings.tags.value))
 }
 
 // Sets (or, with null, removes) one setting for this project or across projects, then reloads them.
-// The level replaced the first builds' "detail": setting or clearing the level clears that too.
-async function setSetting($: any, key: 'language' | 'level' | 'adhd', value: string | null, project: boolean) {
-  const keys = key === 'level' ? ['level', 'detail'] : [key]
+// Tags replaced the "level" and "detail" of earlier versions: setting or clearing tags clears those.
+async function setSetting($: any, key: 'language' | 'tags' | 'adhd', value: string | null, project: boolean) {
+  const keys = key === 'tags' ? ['tags', 'level', 'detail'] : [key]
   if (project) {
     const current = await readProject($)
     if (value === null && !keys.some((k) => k in current)) return loadSettings($)
@@ -386,14 +393,16 @@ async function start($: any) {
   if (!continued) {
     await append($, {
       v: SCHEMA, kind: 'session', ts: now(), session, agent: null, turn: null, root,
-      language: languageName(settings.language), language_code: settings.language.code, level: settings.level.value, adhd: settings.adhd.value, version: VERSION,
+      language: languageName(settings.language), language_code: settings.language.code, tags: settings.tags.value, adhd: settings.adhd.value, version: VERSION,
     })
   }
   await takeBaseline($)
   ready = true
 }
 
-const levelName = (l: Labels, value: string) => l[('level_' + value.replace('-', '_')) as 'level_full'] ?? value
+const tagsName = (tags: Tag[]) => tags.join(', ')
+// Every tag with what it adds, in the reader's language; the tags themselves stay English
+const tagList = (l: Labels) => TAGS.map((t) => '  ' + t.padEnd(14) + l[('tag_desc_' + t) as 'tag_desc_review']).join('\n')
 const sourceName = (l: Labels, source: string) => l[('source_' + source) as 'source_user']
 
 // ---- the review -------------------------------------------------------------------------------
@@ -676,7 +685,7 @@ async function pageOf($: any, model: Review, end: string | null, page: Page): Pr
   const { states, info } = await fileStates($, model, end, page.extra)
   const explorer = explore(model, states, info)
   return fitReview(model, explorer, labels(code), {
-    code, theme: page.theme, version: VERSION, level: model.written ?? settings.level.value, written: !!model.written, mode: page.mode, start: page.start,
+    code, theme: page.theme, version: VERSION, tags: model.written ?? settings.tags.value, written: !!model.written, mode: page.mode, start: page.start,
     command: page.command, made: now(),
   })
 }
@@ -805,7 +814,7 @@ async function share($: any, what: string, theme: Theme, l: Labels): Promise<str
   const model = modelOf(s, all, await explainedFiles($, all))
   const code = shownIn(settings.language.code)
   const command = ('/inloop share ' + what).trim()
-  const text = markdown(model, labels(code), { code, level: model.written ?? settings.level.value, version: VERSION, marker: false, max: SHARE_MD_MAX, command, made: now() }).text
+  const text = markdown(model, labels(code), { code, tags: model.written ?? settings.tags.value, version: VERSION, marker: false, max: SHARE_MD_MAX, command, made: now() }).text
   const { html, cut } = await pageOf($, model, s.end, { theme: theme === 'auto' ? 'light' : theme, mode: 'review', extra: [], start: null, command })
   const name = 'inloop-' + project().replace(/[^\w.-]+/g, '_').slice(0, 40) + (what ? '-' + nameOfRange(what).replace(/^review-?/, '') : '')
   const page = shareFile(name + '.html')
@@ -825,7 +834,7 @@ async function preview($: any, pr: Pr, l: Labels): Promise<string> {
   const s: Scope = { scope: 'range', range: 'pr-' + pr.number, found: got, pending: null, end: pr.head, pr: { number: pr.number, title: pr.title } }
   const model = modelOf(s, all, [])
   const code = shownIn(settings.language.code)
-  const { text, cut } = markdown(model, labels(code), { code, level: model.written ?? settings.level.value, version: VERSION, marker: true, max: COMMENT_MAX, command: '/inloop review pr ' + pr.number, made: now() })
+  const { text, cut } = markdown(model, labels(code), { code, tags: model.written ?? settings.tags.value, version: VERSION, marker: true, max: COMMENT_MAX, command: '/inloop review pr ' + pr.number, made: now() })
   const comment = await ownComment($, pr)
   const md = shareFile('pr-' + pr.number + '.md')
   await keepOutOfGit($)
@@ -916,7 +925,7 @@ function statusText(): string {
   return say(l.status, {
     state: enabled ? l.state_on : l.state_off,
     language: nameOf(settings.language, code), language_source: sourceName(l, settings.language.source),
-    level: levelName(l, settings.level.value), level_source: sourceName(l, settings.level.source),
+    tags: tagsName(settings.tags.value), tags_source: sourceName(l, settings.tags.source),
     adhd: settings.adhd.value ? l.state_on : l.state_off, adhd_source: sourceName(l, settings.adhd.source),
     notes: count(code, l.notes, tally.notes), edits: count(code, l.edits, tally.edits),
     unexplained: tally.unexplained, files: count(code, l.files, tally.outside),
@@ -932,12 +941,11 @@ export function register(on: any, pluginOptions: any) {
     interactive = e.isInteractive !== false
     try {
       await start($)
-      await $.tool.register(NOTE_SPEC)
-      await $.tool.register(RECAP_SPEC)
+      await registerTools($)
       await $.command.register({
         name: PLUGIN,
-        description: 'inloop: review Claude\'s work, explain the code as it stands, the language and level of notes, on and off',
-        argumentHint: '[review [range | all | pr [n]] | explain [path] | share [range | pr [n] [--yes]] | status | lang <language> | level <level> | adhd on|off | on | off | help]',
+        description: 'inloop: review Claude\'s work, explain the code as it stands, what the notes hold (tags), their language, on and off',
+        argumentHint: '[review [range | all | pr [n]] | explain [path] | share [range | pr [n] [--yes]] | tags <tag,...> | status | lang <language> | adhd on|off | on | off | help]',
         immediate: true,
       })
     } catch (err) {
@@ -1148,21 +1156,25 @@ export function register(on: any, pluginOptions: any) {
     // onboarding: notes in this project explain for someone new to the codebase; the tour itself
     // is the /inloop:onboard skill, since a command cannot start a model turn
     if (command === 'onboard' || command === 'onboarding') {
-      await setSetting($, 'level', 'onboarding', true)
+      await setSetting($, 'tags', 'onboarding', true)
+      await registerTools($)
       return { text: l.onboard_set }
     }
-    // "detail" is the first builds' name for the level and still works
-    if (command === 'level' || command === 'detail') {
+    // "level" and "detail" are earlier names of the setting and still work, with their old values
+    if (command === 'tags' || command === 'tag' || command === 'level' || command === 'detail') {
+      if (!value) return { text: say(l.tags_now, { tags: tagsName(settings.tags.value), source: sourceName(l, settings.tags.source) }) + '\n' + tagList(l) }
       if (value === 'reset') {
-        if (!project) await setSetting($, 'level', null, false)
-        await setSetting($, 'level', null, true)
-        return { text: say(l.level_reset, { level: levelName(l, settings.level.value), source: sourceName(l, settings.level.source) }) }
+        if (!project) await setSetting($, 'tags', null, false)
+        await setSetting($, 'tags', null, true)
+        await registerTools($)
+        return { text: say(l.tags_reset, { tags: tagsName(settings.tags.value), source: sourceName(l, settings.tags.source) }) }
       }
-      const level = parseLevel(value)
-      if (!level) return { text: l.level_bad }
-      await setSetting($, 'level', level, project)
-      const said = [say(project ? l.level_project : l.level_user, { level: levelName(l, level) })]
-      if (!project && settings.level.source === 'project') said.push(say(l.level_project_wins, { level: levelName(l, settings.level.value) }))
+      const chosen = parseTags(value)
+      if (!chosen) return { text: l.tags_bad + '\n' + tagList(l) }
+      await setSetting($, 'tags', chosen.join(','), project)
+      await registerTools($)
+      const said = [say(project ? l.tags_project : l.tags_user, { tags: tagsName(chosen) })]
+      if (!project && settings.tags.source === 'project') said.push(say(l.tags_project_wins, { tags: tagsName(settings.tags.value) }))
       return { text: said.join('\n') }
     }
     if (command === 'adhd') {

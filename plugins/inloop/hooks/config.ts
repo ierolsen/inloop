@@ -1,12 +1,12 @@
-// Settings: which language inloop's notes and page are in, which level they explain at, and
-// whether they are written in the ADHD-friendly form.
+// Settings: which language inloop's notes and page are in, which tags say what the notes hold,
+// and whether they are written in the ADHD-friendly form.
 // Plain module: no mods API calls here (see CLAUDE.md).
 
-// From onboarding a developer who just joined (every line, and where it sits in the codebase) to
-// the architecture for one who looks at the whole system. Named for the kind of explanation, not
-// for the reader's job title. In order: each level explains less than the one before it.
-export type Level = 'onboarding' | 'full' | 'guided' | 'essentials' | 'design' | 'big-picture'
-export const LEVELS: Level[] = ['onboarding', 'full', 'guided', 'essentials', 'design', 'big-picture']
+// What the notes are for, which decides what Claude writes into them: a summary costs least, all
+// costs most. Tags combine ("review,learn") and are English in every language, like commands.
+export type Tag = 'summary' | 'review' | 'learn' | 'decisions' | 'architecture' | 'onboarding' | 'all'
+export const TAGS: Tag[] = ['summary', 'review', 'learn', 'decisions', 'architecture', 'onboarding', 'all']
+export const DEFAULT_TAGS: Tag[] = ['review']
 export type Source = 'project' | 'user' | 'plugin' | 'default'
 
 export type Language = {
@@ -19,7 +19,7 @@ export type Language = {
 
 export type Settings = {
   language: Language & { source: Source }
-  level: { value: Level; source: Source }
+  tags: { value: Tag[]; source: Source }
   adhd: { value: boolean; source: Source }
 }
 
@@ -57,8 +57,13 @@ const LANGUAGES: [string, string, string, string[]][] = [
   ['zh', 'Chinese', '中文', ['zho', 'chi', 'cince', 'chinesisch', 'chinees', 'mandarin']],
 ]
 
-// The detail values of the first builds, and other ways people type a level
-const ALIASES: Record<string, Level> = { brief: 'essentials', standard: 'guided', deep: 'full', bigpicture: 'big-picture', big: 'big-picture', architecture: 'big-picture', key: 'essentials', keypoints: 'essentials', onboard: 'onboarding', newcomer: 'onboarding' }
+// The levels and detail values of earlier versions, and other ways people type a tag
+const ALIASES: Record<string, Tag[]> = {
+  full: ['all'], deep: ['all'], everything: ['all'], guided: ['review', 'learn'], standard: ['review', 'learn'],
+  essentials: ['review'], brief: ['review'], key: ['review'], keypoints: ['review'], short: ['summary'],
+  design: ['decisions'], decision: ['decisions'], tradeoffs: ['decisions'], bigpicture: ['architecture'], big: ['architecture'], arch: ['architecture'],
+  onboard: ['onboarding'], newcomer: ['onboarding'], learning: ['learn'], teach: ['learn'],
+}
 
 // "Türkçe" -> "turkce": lower case, accents and separators removed, so any spelling matches
 export function fold(text: string): string {
@@ -89,10 +94,23 @@ export function adhd(input: unknown): boolean | null {
   return null
 }
 
-export function level(input: unknown): Level | null {
-  const text = typeof input === 'string' ? input.trim().toLowerCase().replace(/[\s_]+/g, '-') : ''
-  if ((LEVELS as string[]).includes(text)) return text as Level
-  return ALIASES[text.replace(/-/g, '')] ?? null
+// Tags from "review, learn", "review+learn", "review learn" or a list, in their own order; `all`
+// covers the rest. Null when one of them is no tag inloop knows, or none is given.
+export function tags(input: unknown): Tag[] | null {
+  const pieces = (Array.isArray(input) ? input : typeof input === 'string' ? input.split(/[,+]+/) : []).map((w) => String(w).trim().toLowerCase()).filter(Boolean)
+  if (!pieces.length) return null
+  const one = (w: string): Tag[] | null => {
+    const key = w.replace(/[\s_-]+/g, '')
+    return (TAGS as string[]).includes(key) ? [key as Tag] : ALIASES[key] ?? null
+  }
+  const found = new Set<Tag>()
+  for (const piece of pieces) {
+    // "big picture" is one name; "review learn" is two
+    const tag = one(piece) ?? (piece.includes(' ') ? piece.split(/\s+/).map(one) : [null]).reduce<Tag[] | null>((all, t) => (all && t ? [...all, ...t] : null), [])
+    if (!tag || !tag.length) return null
+    tag.forEach((t) => found.add(t))
+  }
+  return found.has('all') ? ['all'] : TAGS.filter((t) => found.has(t))
 }
 
 // The settings in effect, from the first layer that sets each one: the project's override, the
@@ -104,18 +122,18 @@ export function resolve(layers: { project?: Record<string, unknown>; user?: Reco
     const value = layer && typeof layer.language === 'string' ? language(layer.language) : null
     if (value) { lang = { ...value, source }; break }
   }
-  // a layer may still hold the old "detail" key; "level" wins where both are set
-  let depth: Settings['level'] = { value: 'guided', source: 'default' }
+  // a layer may still hold a "level" or "detail" key of an earlier version; "tags" wins
+  let chosen: Settings['tags'] = { value: DEFAULT_TAGS, source: 'default' }
   for (const [source, layer] of order) {
-    const value = layer ? level(layer.level) ?? level(layer.detail) : null
-    if (value) { depth = { value, source }; break }
+    const value = layer ? tags(layer.tags) ?? tags(layer.level) ?? tags(layer.detail) : null
+    if (value) { chosen = { value, source }; break }
   }
   let easy: Settings['adhd'] = { value: false, source: 'default' }
   for (const [source, layer] of order) {
     const value = layer ? adhd(layer.adhd) : null
     if (value !== null) { easy = { value, source }; break }
   }
-  return { language: lang, level: depth, adhd: easy }
+  return { language: lang, tags: chosen, adhd: easy }
 }
 
 // How the language reads in the instructions: "Turkish (Türkçe)", or the name as given

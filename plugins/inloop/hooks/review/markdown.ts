@@ -4,8 +4,8 @@
 
 import type { Labels } from '../i18n/en.ts'
 import { count, say } from '../i18n/index.ts'
-import type { Level } from '../config.ts'
-import { HIDDEN_AT } from './style.ts'
+import type { Tag } from '../config.ts'
+import { partsOf } from '../parts.ts'
 import { when } from './html.ts'
 import { markKey, type Review, type Group, type NoteRef } from './review.ts'
 import type { Mark, MarkKind } from './anchor.ts'
@@ -26,7 +26,7 @@ const code = (text: string) => '`' + text.replace(/`/g, "'") + '`'
 const short = (sha: string | null) => (sha ?? '').slice(0, 7)
 
 // command and made: the command that wrote the text and when, for its last line
-export type MdOptions = { code: string | null; level: Level; version: string; marker: boolean; max: number; command: string; made: number }
+export type MdOptions = { code: string | null; tags: Tag[]; version: string; marker: boolean; max: number; command: string; made: number }
 type Keep = { marks: boolean; terms: boolean; what: boolean }
 
 function heading(g: Group, l: Labels): string {
@@ -81,17 +81,17 @@ function noteMd(ref: NoteRef, g: Group, where: Map<string, { path: string; at: n
   if (n.tldr) out.push('> ' + line(n.tldr))
   const field = (name: string, text: string) => (text.trim() ? out.push('**' + name + '**\n\n' + md(text)) : 0)
   const list = (name: string, items: string[]) => (items.length ? out.push('**' + name + '**\n\n' + items.map((x) => '- ' + line(x)).join('\n')) : 0)
-  if (keep.what && o.level !== 'big-picture') field(l.page_what, n.what)
+  const parts = partsOf(o.tags).note // the tags leave out what they do not name, as on the page
+  if (keep.what) field(l.page_what, n.what)
   field(l.page_why, n.why)
   list(l.r_outcome, ref.outcomes)
-  list(l.r_instead, n.alternatives)
-  list(l.r_impact, n.impact)
-  list(l.page_risks, n.risks)
+  if (parts.includes('alternatives')) list(l.r_instead, n.alternatives)
+  if (parts.includes('impact')) list(l.r_impact, n.impact)
+  if (parts.includes('risks')) list(l.page_risks, n.risks)
   if (keep.marks) {
-    const hidden = HIDDEN_AT[o.level] // what the level leaves out, as on the page
     const marks: Mark[] = []
-    // a deleted line's comment shows and hides with the comments on lines
-    const add = (kind: MarkKind, size: number) => { if (!hidden.includes(kind === 'removed' ? 'line' : kind)) for (let item = 0; item < size; item++) marks.push({ kind, note: ref.id, item }) }
+    const partOf = { symbol: 'symbols', use: 'uses', param: 'parameters', line: 'lines', removed: 'removed' } as const
+    const add = (kind: MarkKind, size: number) => { if (parts.includes(partOf[kind])) for (let item = 0; item < size; item++) marks.push({ kind, note: ref.id, item }) }
     add('symbol', n.symbols.length)
     add('use', n.uses.length)
     add('param', n.parameters.length)
@@ -102,7 +102,7 @@ function noteMd(ref: NoteRef, g: Group, where: Map<string, { path: string; at: n
       (a.w ? 0 : 1) - (b.w ? 0 : 1) || (a.w?.path ?? '').localeCompare(b.w?.path ?? '') || (a.w?.at ?? 0) - (b.w?.at ?? 0))
     if (sorted.length) out.push('<details><summary>' + l.md_lines + ' (' + sorted.length + ')</summary>\n\n' + sorted.map((x) => markLine(x.m, ref, x.w, l)).join('\n') + '\n\n</details>')
   }
-  if (keep.terms && !HIDDEN_AT[o.level].includes('terms') && n.terms.length) {
+  if (keep.terms && parts.includes('terms') && n.terms.length) {
     out.push('<details><summary>' + l.r_terms + ' (' + n.terms.length + ')</summary>\n\n' + n.terms.map((t) => '- **' + line(t.term) + '**: ' + line(t.means)).join('\n') + '\n\n</details>')
   }
   return out.join('\n\n')

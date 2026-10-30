@@ -2,7 +2,7 @@
 // base; dark follows the system unless the reader picks a theme, and a page written with a fixed
 // theme keeps it.
 
-import type { Level } from '../config.ts'
+import { PARTS } from '../parts.ts'
 
 const LIGHT = `
   --bg: #f6f5f1; --panel: #ffffff; --ink: #1f1d1a; --muted: #67625a; --faint: #8f897f;
@@ -23,18 +23,13 @@ const DARK = `
   --k: #d39be6; --s: #9bd5a8; --n: #f0ad7e; --f: #8fb8f0; --c: #8a847a;
   color-scheme: dark;`
 
-// What each level hides of notes written in more detail: the page can leave detail out, never add
-// what was not written. The parts are classes on explanations, their pins and parts of a note.
-export const HIDDEN_AT: Record<Level, string[]> = {
-  'onboarding': [],
-  'full': [],
-  'guided': [],
-  'essentials': ['param', 'use', 'terms'],
-  'design': ['param', 'use', 'line', 'terms'],
-  'big-picture': ['param', 'use', 'line', 'symbol', 'terms'],
-}
-const levels = Object.entries(HIDDEN_AT).filter(([, parts]) => parts.length)
-  .map(([level, parts]) => parts.map((p) => '[data-level="' + level + '"] .lv-' + p).join(', ') + ' { display: none; }').join('\n')
+// The parts the reader's tags leave out, hidden by the html element's data-hide: the page can leave
+// parts out, never add what the notes do not hold. Each part is a class on explanations, their pins
+// and the fields of a note.
+const hiding = PARTS.map((p) => '[data-hide~="' + p + '"] .lv-' + p + ' { display: none; }').join('\n')
+// when nothing beside the code is left, the code takes the whole width
+const MARK_PARTS = ['lines', 'removed', 'symbols', 'uses', 'parameters']
+const noGloss = MARK_PARTS.map((p) => '[data-hide~="' + p + '"]').join('')
 
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace'
 
@@ -73,28 +68,30 @@ strong { font-weight: 650; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 .tools > button, .tools select { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .tools > button:hover, .seg button:hover, .tools select:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
-.lvl-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
-.lvl-btn:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
-.lvl-btn .k { color: var(--muted); }
-.lvl-btn .v { font-weight: 600; }
-.lvl-btn .chev { width: 12px; height: 12px; color: var(--muted); }
-/* the level chooser: a dialog over the page, a sheet from the bottom on a phone */
-.lvl-modal { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--panel); color: var(--ink); box-shadow: 0 24px 64px var(--shadow); }
-.lvl-modal::backdrop { background: var(--scrim, rgba(0, 0, 0, .4)); }
-.lvl-in { padding: 18px 20px 20px; }
-.lvl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 6px; }
-.lvl-head h2 { font-size: 19px; margin: 0; }
-.lvl-head .x { font: inherit; font-size: 22px; line-height: 1; color: var(--muted); background: transparent; border: 0; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
-.lvl-head .x:hover { background: var(--accent-soft); color: var(--ink); }
-.lvl-modal .hint { margin: 0 0 14px; font-size: 13.5px; }
-ul.lvl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-ul.lvl-list button { width: 100%; text-align: left; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; }
-ul.lvl-list button:hover { border-color: var(--accent); }
-ul.lvl-list button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-ul.lvl-list button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
-ul.lvl-list .n { font-weight: 650; }
-ul.lvl-list .badge { justify-self: end; }
-ul.lvl-list .d { grid-column: 1 / -1; color: var(--muted); font-size: 13.5px; }
+.tags-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+.tags-btn:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
+.tags-btn .k { color: var(--muted); }
+.tags-btn .v { font-weight: 600; }
+.tags-btn .chev { width: 12px; height: 12px; color: var(--muted); }
+/* the tag chooser: a dialog over the page, a sheet from the bottom on a phone */
+.tags-modal { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--panel); color: var(--ink); box-shadow: 0 24px 64px var(--shadow); }
+.tags-modal::backdrop { background: var(--scrim, rgba(0, 0, 0, .4)); }
+.tags-in { padding: 18px 20px 20px; }
+.tags-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 6px; }
+.tags-head h2 { font-size: 19px; margin: 0; }
+.tags-head .x { font: inherit; font-size: 22px; line-height: 1; color: var(--muted); background: transparent; border: 0; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
+.tags-head .x:hover { background: var(--accent-soft); color: var(--ink); }
+.tags-modal .hint { margin: 0 0 14px; font-size: 13.5px; }
+ul.tags-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+ul.tags-list button { width: 100%; text-align: left; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; }
+ul.tags-list button:hover { border-color: var(--accent); }
+ul.tags-list button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+ul.tags-list button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
+ul.tags-list .n { font-weight: 650; }
+ul.tags-list .badge { justify-self: end; }
+ul.tags-list .d { grid-column: 1 / -1; color: var(--muted); font-size: 13.5px; }
+ul.tags-list .n { font-family: ${MONO}; font-size: 14px; }
+ul.tags-list button[aria-pressed="true"] .n::before { content: "\\2713  "; color: var(--accent); }
 .drawer-btn, .drawer-close { display: none; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; background: var(--panel); }
 .drawer-toggle { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
 .scrim { display: none; }
@@ -333,11 +330,11 @@ table.index th { text-align: left; color: var(--muted); font-weight: 600; font-s
 table.index td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
 footer { color: var(--faint); font-size: 13px; border-top: 1px solid var(--line); margin-top: 48px; padding-top: 16px; }
 
-/* the level the reader picked; at the big picture no explanation sits beside a line */
-${levels}
-[data-level="big-picture"] .rows { grid-template-columns: minmax(0, 1fr); }
-[data-level="big-picture"] .rows > .gloss { display: none; }
-[data-level="big-picture"] .rows > .src { border-top: 0; }
+/* the parts the reader's tags leave out; with no explanation beside a line left, the code takes the width */
+${hiding}
+${noGloss} .rows { grid-template-columns: minmax(0, 1fr); }
+${noGloss} .rows > .gloss { display: none; }
+${noGloss} .rows > .src { border-top: 0; }
 
 @media (max-width: 1100px) {
   /* minmax(0, ...): a long line of code scrolls inside its block instead of widening the page */
@@ -362,9 +359,9 @@ ${levels}
   table.files th.name { width: 55%; }
 }
 @media (max-width: 600px) {
-  .mode, .tools > button:not(.lvl-btn) { display: none; }
-  .lvl-btn .k { display: none; }
-  .lvl-modal { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 14px 14px 0 0; max-height: 85vh; }
+  .mode, .tools > button:not(.tags-btn) { display: none; }
+  .tags-btn .k { display: none; }
+  .tags-modal { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 14px 14px 0 0; max-height: 85vh; }
   dl.glossary { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .drawer-btn { padding: 5px 8px; }
   .drawer-btn .t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -383,7 +380,7 @@ ${levels}
 }
 @media print {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .appbar, .side, nav.tabs, .cnav, .drawer-toggle, .findrow, .lvl-modal { display: none !important; }
+  .appbar, .side, nav.tabs, .cnav, .drawer-toggle, .findrow, .tags-modal { display: none !important; }
   .app { display: block; }
   .views { padding: 0; }
   html.print-all .view[data-in-print] { display: block !important; break-before: page; }
@@ -397,7 +394,7 @@ ${levels}
 // The view the page opens on when the address names none: drawn by CSS, so it needs no script
 export const startCss = (id: string) => `body:not(:has(:target)) #${id} { display: block; }\n`
 
-// Search, keys, the level and theme switches, printing, and the tree following the view. The page
+// Search, keys, the tag and theme switches, printing, and the tree following the view. The page
 // reads the same without it: every view opens through its #anchor.
 export const SCRIPT = `
 (function () {
@@ -435,32 +432,41 @@ export const SCRIPT = `
   }
   window.addEventListener('hashchange', show);
 
-  // the level chooser: opens over the page; choosing a level hides what it leaves out
-  var levels = document.getElementById('levels');
-  var opener = document.querySelector('[data-level-open]');
-  function markLevel() {
-    var now = d.getAttribute('data-level');
-    all('[data-level-choice]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-level-choice') === now)); });
-    var chosen = document.querySelector('[data-level-choice="' + now + '"] .n');
-    var name = document.querySelector('[data-level-name]');
-    if (chosen && name) name.textContent = chosen.textContent;
+  // the tag chooser: opens over the page; the parts no pressed tag names are hidden. "all" stands
+  // alone, any other tag turns it off.
+  var chooser = document.getElementById('tags');
+  var opener = document.querySelector('[data-tags-open]');
+  var partsOf = {};
+  try { partsOf = JSON.parse(chooser.getAttribute('data-parts')); } catch (err) {}
+  function pressed() { return all('[data-tag-choice][aria-pressed="true"]').map(function (b) { return b.getAttribute('data-tag-choice'); }); }
+  function applyTags() {
+    var on = pressed();
+    var shown = {};
+    on.forEach(function (t) { (partsOf[t] || []).forEach(function (p) { shown[p] = true; }); });
+    var every = Object.keys(partsOf).reduce(function (a, t) { return a.concat(partsOf[t]); }, []);
+    var hide = every.filter(function (p, i) { return every.indexOf(p) === i && !shown[p]; });
+    d.setAttribute('data-hide', hide.join(' '));
+    var name = document.querySelector('[data-tags-name]');
+    if (name) name.textContent = on.join(', ') || 'summary';
   }
-  if (levels && opener && levels.showModal) {
+  if (chooser && opener && chooser.showModal) {
     opener.addEventListener('click', function () {
-      levels.showModal();
-      var on = levels.querySelector('[aria-pressed="true"]');
-      if (on) on.focus();
+      chooser.showModal();
+      var first = chooser.querySelector('[aria-pressed="true"]') || chooser.querySelector('[data-tag-choice]');
+      if (first) first.focus();
     });
-    levels.addEventListener('click', function (e) {
-      if (e.target === levels || up(e.target, '[data-level-close]')) { levels.close(); return; }
-      var pick = up(e.target, '[data-level-choice]');
-      if (pick) {
-        d.setAttribute('data-level', pick.getAttribute('data-level-choice'));
-        markLevel();
-        levels.close();
-      }
+    chooser.addEventListener('click', function (e) {
+      if (e.target === chooser || up(e.target, '[data-tags-close]')) { chooser.close(); return; }
+      var pick = up(e.target, '[data-tag-choice]');
+      if (!pick) return;
+      var tag = pick.getAttribute('data-tag-choice');
+      var now = pick.getAttribute('aria-pressed') !== 'true';
+      if (tag === 'all' && now) all('[data-tag-choice]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+      if (tag !== 'all' && now) { var a = chooser.querySelector('[data-tag-choice="all"]'); if (a) a.setAttribute('aria-pressed', 'false'); }
+      pick.setAttribute('aria-pressed', String(now));
+      applyTags();
     });
-    levels.addEventListener('close', function () { opener.focus(); });
+    chooser.addEventListener('close', function () { opener.focus(); });
   } else if (opener) opener.hidden = true;
 
   // "Go to file": the tree keeps the files whose path holds the letters typed, in order
@@ -501,7 +507,7 @@ export const SCRIPT = `
     });
   }
   document.addEventListener('keydown', function (e) {
-    if (e.key !== 't' || e.metaKey || e.ctrlKey || e.altKey || !find || (levels && levels.open)) return;
+    if (e.key !== 't' || e.metaKey || e.ctrlKey || e.altKey || !find || (chooser && chooser.open)) return;
     var t = e.target;
     if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
     e.preventDefault();
@@ -524,7 +530,6 @@ export const SCRIPT = `
   });
   window.addEventListener('afterprint', function () { d.classList.remove('print-all'); });
   markTheme();
-  markLevel();
   show();
 })();
 `

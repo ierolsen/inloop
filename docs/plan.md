@@ -28,6 +28,9 @@ hard to find things in. These changes followed:
   explanations of existing code is now `/inloop:annotate`.
 - Next: sharing (`/inloop share` as a file and as a pull request comment), `/inloop review pr`,
   and in December a share link through a secret gist.
+- **Tags replace levels** (30 Oct, Erol: "tagler önemli", token and budget friendly): `summary`,
+  `review`, `learn`, `decisions`, `architecture`, `onboarding`, `all`, combinable; Claude writes only
+  the parts the tags name.
 
 The sections below are the plan as it was approved on 29 Oct.
 

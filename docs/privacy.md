@@ -20,8 +20,8 @@ session, the review pages in `.inloop/review/`, and what you share in `.inloop/s
 `*`, so nothing in it is committed unless you change that. Deleting the folder deletes everything
 inloop recorded. A session that records nothing writes nothing.
 
-Your choice of language, level and form across projects is kept in the plugin's own store in
-Claude Code (`/inloop lang`, `/inloop level`, `/inloop adhd`); a project's choice is kept in
+Your choice of language, tags and form across projects is kept in the plugin's own store in
+Claude Code (`/inloop lang`, `/inloop tags`, `/inloop adhd`); a project's choice is kept in
 `.inloop/config.json`.
 
 ## What leaves your computer, and when

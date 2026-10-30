@@ -162,8 +162,8 @@ test('commits find their notes by record, by a reconstructed note\'s commit, and
   expect(r.links.get('Rectangle')).toEqual({ href: '#c-b2b2b2b2-f0-1', title: 'holds sizes' })
   expect(r.checks).toEqual(['Run `pytest`.'])
   expect(r.counts.commits).toBe(4)
-  // the session was written before levels had their names: "standard" is "guided"
-  expect(r.written).toBe('guided')
+  // the session was written by an early version, with detail "standard": that is review and learn
+  expect(r.written).toEqual(['review', 'learn'])
 })
 
 // The files of that history as they stand, and which commit last wrote each line: a later change
@@ -183,7 +183,7 @@ const STATES = [
   stateOf('docs/old/notes.md', null, null, 'deleted'),
 ]
 const INFO = new Map([['a1a1a1a1', { summary: 'chore: start', time: 1_600_000_000_000 }]])
-const OPTIONS = { code: 'tr', theme: 'auto' as const, version: '0.1.0', level: 'guided' as const, written: true, mode: 'review' as const, start: null, command: '/inloop review', made: 1_700_000_000_000 }
+const OPTIONS = { code: 'tr', theme: 'auto' as const, version: '0.1.0', tags: ['review', 'learn'] as any, written: true, mode: 'review' as const, start: null, command: '/inloop review', made: 1_700_000_000_000 }
 
 // Every anchor once, and every link inside the page lands on one: a link to nothing would quietly
 // show the overview instead.
@@ -234,14 +234,14 @@ test('the explorer: a tree of files, each with its code, its changes and why eac
   const x = explore(r, STATES as any, INFO)
   const html = render(r, x, labels('tr'), OPTIONS)
   linksHold(html)
-  expect(html).toContain('<html lang="tr" data-level="guided" data-start="overview">')
+  expect(html).toContain('<html lang="tr" data-tags="review,learn" data-start="overview">')
   expect(html).toContain("default-src 'none'")
   expect(html.split('<script>').length).toBe(3) // the theme boot and the page's script, nothing else
   expect(html).toContain('body:not(:has(:target)) #overview { display: block; }')
-  expect(html).toContain('[data-level="essentials"] .lv-param')
+  expect(html).toContain('[data-hide~="parameters"] .lv-parameters { display: none; }')
   expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
   for (const word of ['Review: Claude neyi değiştirdi, neden', 'Commit 1 / 4', 'Henüz commitlenmedi', 'Sonradan açıklanan kod', 'Class&#39;lar ve fonksiyonlar', 'Otomatik', 'PDF olarak kaydet',
-    'Dosyaya git', 'Genel bakış', 'Değişiklikler', 'Neden', 'Son değişiklik', 'Hepsini PDF yap', 'tam anlatım', 'büyük resim', 'bu review&#39;da yok', 'Açıklanmış ama satırları sonradan değişmiş',
+    'Dosyaya git', 'Genel bakış', 'Değişiklikler', 'Neden', 'Son değişiklik', 'Hepsini PDF yap', 'Notlar ne içersin', 'onboarding', 'bu review&#39;da yok', 'Açıklanmış ama satırları sonradan değişmiş',
     'kaynak: shapes.py', 'picks the <strong>biggest</strong>', 'Bu commit&#39;in notu yok', '<code>/inloop:annotate f6f6f6f</code>', 'içerik kaydedilmedi', '1 secret gizlendi',
     'Elle kontrol edilecekler', 'Added <strong>shapes</strong>.', 'Terimler', '<dt>random seed</dt>', 'Etkisi', 'app.py relies on largest()', '<code>/inloop:annotate README.md</code>']) {
     expect(html, word).toContain(word)
@@ -252,13 +252,13 @@ test('the explorer: a tree of files, each with its code, its changes and why eac
   expect(html).toContain('<a href="#' + dirId('docs/old') + '">docs/old</a>')
   for (const id of [shapes, shapes + '_changes', shapes + '_why', dirId('docs/old'), 'd-root', 'c-b2b2b2b2', 'pending', 'explained', 'index']) expect(html, id).toContain('<section class="view" id="' + id + '"')
   // the code as it stands: one line number, the pin beside it, and links to the definition in it
-  expect(html).toContain('<tr id="' + shapes + '_L1"><td class="n">1</td><td class="p"><span class="pin lv-symbol">1</span></td><td class="c"><span class="t-k">class</span> <span class="t-f">Rectangle</span>:</td></tr>')
+  expect(html).toContain('<tr id="' + shapes + '_L1"><td class="n">1</td><td class="p"><span class="pin lv-symbols">1</span></td><td class="c"><span class="t-k">class</span> <span class="t-f">Rectangle</span>:</td></tr>')
   expect(html).toContain('<a class="xref" href="#' + shapes + '_1" title="holds sizes">Rectangle</a>')
   // the diff in its commit keeps two numbers and the mark of each line
-  expect(html).toContain('<td class="o"></td><td class="n">1</td><td class="p"><span class="pin lv-symbol">1</span></td><td class="m">+</td>')
-  const en = render(build(source()), explore(build(source()), STATES as any, INFO), labels('en'), { ...OPTIONS, code: 'en', theme: 'dark', level: 'big-picture', mode: 'explain', start: fileId('app.py') })
+  expect(html).toContain('<td class="o"></td><td class="n">1</td><td class="p"><span class="pin lv-symbols">1</span></td><td class="m">+</td>')
+  const en = render(build(source()), explore(build(source()), STATES as any, INFO), labels('en'), { ...OPTIONS, code: 'en', theme: 'dark', tags: ['architecture'], mode: 'explain', start: fileId('app.py') })
   linksHold(en)
-  expect(en).toContain('<html lang="en" data-theme="dark" data-fixed data-level="big-picture" data-start="' + fileId('app.py') + '">')
+  expect(en).toContain('<html lang="en" data-theme="dark" data-fixed data-tags="architecture" data-start="' + fileId('app.py') + '">')
   expect(en).toContain('body:not(:has(:target)) #' + fileId('app.py') + ' { display: block; }')
   for (const word of ['Explain: the code as it stands', 'Commit 1 of 4', '2 older commits in this range are not shown.', 'not in this review', 'Go to file']) expect(en, word).toContain(word)
   expect(html).toContain('<footer>inloop 0.1.0 &middot; <code>/inloop review</code> &middot; ')
@@ -291,9 +291,9 @@ test('a page over its budget leaves out what it shows twice first, then the long
   expect(small).toContain('See this change in its commit')
 })
 
-test('the Markdown of a review: no HTML and no mentions from a note, levels as on the page, and within its limit', async () => {
+test('the Markdown of a review: no HTML and no mentions from a note, tags as on the page, and within its limit', async () => {
   expect(md('a <b> `x<y> @a` @erol & @team-x')).toBe('a &lt;b&gt; `x<y> @a` @⁠erol &amp; @⁠team-x')
-  const O = { code: 'en', level: 'full' as const, version: '0.1.0', marker: true, max: COMMENT_MAX, command: '/inloop share pr 7', made: 1_700_000_000_000 }
+  const O = { code: 'en', tags: ['all'] as any, version: '0.1.0', marker: true, max: COMMENT_MAX, command: '/inloop share pr 7', made: 1_700_000_000_000 }
   const full = markdown(build(source()), labels('en'), O)
   expect(full.text.startsWith(MARKER + '\n\n## Review: what Claude changed, and why\n\n<sub>4 commits \u00b7 7 files \u00b7 5 notes</sub>\n')).toBe(true)
   expect(full.cut).toBe(false)
@@ -301,10 +301,11 @@ test('the Markdown of a review: no HTML and no mentions from a note, levels as o
     '- **random seed**: the start of a random sequence', '- [ ] Run `pytest`.', '&lt;script&gt;alert(1)&lt;/script&gt;', '**Impact**\n\n- app.py relies on largest()', '2 older commits in this range are not shown.']) {
     expect(full.text, word).toContain(word)
   }
-  // a higher level leaves out what the page would hide
-  const big = markdown(build(source()), labels('en'), { ...O, level: 'big-picture' }).text
-  for (const gone of ['Line by line', 'random seed', '**What**']) expect(big, gone).not.toContain(gone)
+  // fewer tags leave out what the page would hide
+  const big = markdown(build(source()), labels('en'), { ...O, tags: ['architecture'] }).text
+  for (const gone of ['Line by line', 'random seed']) expect(big, gone).not.toContain(gone)
   expect(big).toContain('app.py relies on largest()')
+  expect(markdown(build(source()), labels('en'), { ...O, tags: ['summary'] }).text).not.toContain('**Impact**')
   // over the limit: detail goes first, then the oldest commits, and the text says so
   for (const max of [full.text.length - 100, Math.round(full.text.length / 2), 400]) {
     const tight = markdown(build(source()), labels('en'), { ...O, max })
@@ -321,8 +322,8 @@ test('the Markdown of a review: no HTML and no mentions from a note, levels as o
 
 test('more than two pins on a line become one, so the gutter keeps its width and the code its indentation', async () => {
   const kinds = new Map<number, any>([[6, 'param'], [7, 'param'], [8, 'param'], [9, 'param'], [3, 'line']])
-  expect(pinsHtml([6, 7], kinds)).toBe('<span class="pin lv-param">6</span><span class="pin lv-param">7</span>')
-  expect(pinsHtml([6, 7, 8, 9], kinds)).toBe('<span class="pin wide lv-param" title="6, 7, 8, 9">6-9</span>')
+  expect(pinsHtml([6, 7], kinds)).toBe('<span class="pin lv-parameters">6</span><span class="pin lv-parameters">7</span>')
+  expect(pinsHtml([6, 7, 8, 9], kinds)).toBe('<span class="pin wide lv-parameters" title="6, 7, 8, 9">6-9</span>')
   expect(pinsHtml([3, 7, 8], kinds)).toBe('<span class="pin wide" title="3, 7, 8">3+2</span>')
 })
 
@@ -349,16 +350,16 @@ test('a deleted line is explained beside it in the diff, and the code as it stan
   const html = render(r, x, labels('tr'), OPTIONS)
   linksHold(html)
   // in the commit: the pin on the red line, the comment marked as a deleted line
-  expect(html).toContain('<td class="p"><span class="pin lv-line">1</span></td><td class="m">-</td><td class="c"><span class="t-k">def</span> <span class="t-f">largest</span>(rects):</td>')
+  expect(html).toContain('<td class="p"><span class="pin lv-removed">1</span></td><td class="m">-</td><td class="c"><span class="t-k">def</span> <span class="t-f">largest</span>(rects):</td>')
   expect(html).toContain('<span class="kind gone">silinen satır</span></div><div class="lead rich"><p>Nobody calls it <strong>any more</strong>.</p></div>')
   // what found no deleted line is listed with the code it quoted
   expect(html).toContain('<code class="gone">nowhere at all</code>')
   // the code as it stands says where the explanation went
   expect(html).toContain('<p class="hint"><a href="#' + fileId('shapes.py') + '_changes">Silinen 1 satırın açıklaması Değişiklikler sekmesinde.</a></p>')
   // in Markdown, the deleted line is struck through, with its old line number
-  const text = markdown(build(src), labels('en'), { code: 'en', level: 'full', version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text
+  const text = markdown(build(src), labels('en'), { code: 'en', tags: ['all'], version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text
   expect(text).toContain('- `shapes.py:5` ~~`def largest(rects):`~~ (deleted line): Nobody calls it **any more**.')
-  expect(markdown(build(src), labels('en'), { code: 'en', level: 'design', version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text).not.toContain('deleted line')
+  expect(markdown(build(src), labels('en'), { code: 'en', tags: ['decisions'], version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text).not.toContain('deleted line')
 })
 
 // note n1 (number 1 in session s1) is the Shapes note of commit b2b2b2b2; a recap names it
@@ -374,18 +375,22 @@ test('what was found after a change shows under its note, with the reason, in th
   const changes = html.split('<section class="view" id="' + fileId('shapes.py') + '_changes"')[1].split('</section>')[0]
   expect(changes).toContain('<div class="why-box rich"><b>Neden</b>')
   expect(changes).toContain('<div class="outcome-box rich"><b>Sonuç</b><ul><li>The tests pass: <strong>4 of 4</strong>.</li></ul></div>')
-  expect(markdown(build(source({ records: [...OUTCOME_RECORDS(), after] })), labels('en'), { code: 'en', level: 'full', version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text)
+  expect(markdown(build(source({ records: [...OUTCOME_RECORDS(), after] })), labels('en'), { code: 'en', tags: ['all'], version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text)
     .toContain('**Outcome**\n\n- The tests pass: **4 of 4**.')
 })
 
-test('a dialog chooses the level: every level with what it shows, the notes\' own level marked', async () => {
+test('a dialog chooses the tags: every tag in English with what it adds, the tags the notes were written with pressed', async () => {
   const r = build(source())
   const html = render(r, explore(r, STATES as any, INFO), labels('tr'), OPTIONS)
-  expect(html).toContain('<button type="button" class="lvl-btn" data-level-open aria-haspopup="dialog"><span class="k">Seviye:</span> <span class="v" data-level-name>rehberli</span>')
-  expect(html).toContain('<dialog class="lvl-modal" id="levels" aria-labelledby="levels-title">')
-  expect(html.split('<dialog')[1].split('</dialog>')[0].match(/data-level-choice="/g)?.length).toBe(6)
-  expect(html).toContain('<button type="button" data-level-choice="guided" aria-pressed="true"><span class="n">rehberli</span><span class="badge new">notların seviyesi</span>')
-  expect(html).toContain('<button type="button" data-level-choice="onboarding" aria-pressed="false"><span class="n">onboarding</span><span class="d">Projeye yeni katılan için')
+  expect(html).toContain('<button type="button" class="tags-btn" data-tags-open aria-haspopup="dialog"><span class="k">Tag&#39;ler:</span> <span class="v" data-tags-name>review, learn</span>')
+  expect(html).toContain('<dialog class="tags-modal" id="tags" aria-labelledby="tags-title" data-parts="')
+  const dialog = html.split('<dialog')[1].split('</dialog>')[0]
+  expect(dialog.match(/data-tag-choice="/g)?.length).toBe(7)
+  expect(dialog).toContain('<button type="button" data-tag-choice="review" aria-pressed="true"><span class="n">review</span><span class="badge new">yazıldı</span>')
+  expect(dialog).toContain('<button type="button" data-tag-choice="summary" aria-pressed="false"><span class="n">summary</span><span class="d">Özü, ne değişti ve neden')
+  expect(dialog).toContain('&quot;decisions&quot;:[&quot;alternatives&quot;,&quot;impact&quot;,&quot;risks&quot;]')
+  // with every mark part hidden the code takes the width
+  expect(html).toContain('[data-hide~="lines"][data-hide~="removed"][data-hide~="symbols"][data-hide~="uses"][data-hide~="parameters"] .rows { grid-template-columns: minmax(0, 1fr); }')
   expect(html).not.toContain('<select')
 })
 

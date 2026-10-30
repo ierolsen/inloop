@@ -25,10 +25,13 @@ The first version.
   `--yes` posts it or updates inloop's earlier comment, through your own `gh`.
 - `/inloop:annotate`: explanations of existing code and of past commits.
 - `/inloop:onboard`: a tour of an existing codebase for someone new to it, ending with a guide
-  (reading path, setup, conventions, questions, first tasks); `/inloop onboard` sets the level for
-  the project.
-- Six levels of explanation (`/inloop level`), from `onboarding` to `big-picture`; on the page, a
-  dialog hides detail down to the big picture.
+  (reading path, setup, conventions, questions, first tasks); `/inloop onboard` sets the
+  `onboarding` tag for the project.
+- Tags decide what the notes hold (`/inloop tags`): `summary`, `review` (the default), `learn`,
+  `decisions`, `architecture`, `onboarding`, `all`, combinable; Claude is asked for and offered
+  only their fields. On the page, a dialog turns tags off to hide parts. The levels of earlier
+  versions map onto tags.
+- `bench/`: measures what inloop costs, task by task, against inloop off.
 - Comments on deleted lines give the reason each one goes; a recap's outcomes say what was found
   after a note's change, under the note and in the file's Changes.
 - Technical words kept as developers say them in every language (names, verbs and properties),

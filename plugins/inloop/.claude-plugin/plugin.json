@@ -25,19 +25,11 @@
       "description": "The language of inloop's notes and review page, as a name or a code (English, Türkçe, Deutsch, Nederlands, tr, de, nl ...). It does not depend on the language you chat in.",
       "default": "English"
     },
-    "level": {
+    "tags": {
       "type": "string",
-      "title": "Level",
-      "description": "How the notes explain. onboarding: for someone who just joined: everything full explains, plus where each change sits in the codebase and what to read next. full: nearly every line and every term, for someone new to the code. guided: the lines that carry the logic and the patterns behind them. essentials: what and why, only what is not obvious. design: decisions, trade-offs and impact on other parts. big-picture: architecture and long-term risks, no line detail.",
-      "options": [
-        "onboarding",
-        "full",
-        "guided",
-        "essentials",
-        "design",
-        "big-picture"
-      ],
-      "default": "guided"
+      "title": "Tags",
+      "description": "What the notes hold, as tags combined with commas: summary (the point, what and why; the cheapest), review (what a reviewer needs), learn (line by line, imports, parameters, terms), decisions (trade-offs and options weighed), architecture (system-level consequences), onboarding (learn, plus where the code sits in the codebase), all (everything; the most expensive). Tag names are English in every language.",
+      "default": "review"
     },
     "adhd": {
       "type": "string",

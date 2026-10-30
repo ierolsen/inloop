@@ -22,7 +22,7 @@ stay English; Claude writes the values in the user's language.
 ### Instructions as a system-prompt section
 
 A `prompt.compose` hook appends one section, `inloop:instructions`, on the `session` side of the
-cache boundary. Its text depends only on the settings (language, level, ADHD form, on or off). The prompt
+cache boundary. Its text depends only on the settings (language, tags, ADHD form, on or off). The prompt
 cache therefore stays valid between requests and changes once when a setting changes.
 
 ### Edits are captured around the tool call
@@ -125,10 +125,10 @@ stand, and opens it on the file or folder named.
 - **Views without a script.** Every view is drawn in advance and shown by the address's `#anchor`
   (CSS `:target` and `:has()`), so the page works as a mail attachment or with scripts off. The
   view the page opens on is written into its CSS. A small script adds the search, the keys, the
-  level switch and the theme switch.
-- **The level switch** opens at the most detailed level the notes on the page were written at and
-  hides detail above it: parameters, borrowed names and terms at `essentials`, line comments too
-  at `design`, every mark at `big-picture`. It cannot add what Claude did not write.
+  tag switch and the theme switch.
+- **The tag switch** opens with the tags the notes on the page were written with pressed; turning
+  a tag off hides the parts no pressed tag names (`data-hide` on the page). It cannot add what
+  Claude did not write.
 - **The page** is one file with no network: inline CSS, a small built-in highlighter, a theme switch
   (auto, light, dark), "Save as PDF" for the open view and "Everything as PDF" for every commit
   (or every file, for `/inloop explain`). `--theme light|dark` writes it with a fixed theme, to
@@ -151,7 +151,7 @@ mean shipping a key in a plugin.
   Markdown (`review/markdown.ts`), under 60,000 characters (GitHub takes 65,536): line by line
   goes first, then terms, then "what", then the oldest commits, and the text says what was left
   out. Note text keeps its Markdown, but HTML in it shows as text and `@name` gets an invisible
-  joiner so nobody is notified. The level hides what the page would hide.
+  joiner so nobody is notified. The tags leave out what the page would hide.
   - A plain run writes the comment to `.inloop/share/pr-<n>.md`, with the pull request's head in
     `pr-<n>.json`, and only reads from GitHub. `--yes` posts that file's text only when the head
     is unchanged and the command was typed at Claude Code's prompt (origin `composer`, or
@@ -190,19 +190,41 @@ instead of waiting for a password.
 instructions: the point first in `tldr`, one idea per sentence, short "- " lines, bold for the
 words a skimming reader must not miss, the same order every time, every term, symbol, formula and
 parameter explained the first time with an example from the code, no em-dashes. It sets the form;
-the level still sets how much is explained. Terms stay as developers say them: the form asks for
-a term to be explained, never translated.
+the tags still set what is explained. Terms stay as developers say them: the form asks for a term
+to be explained, never translated.
 
-### Levels and terms
+### Tags and terms
 
-`/inloop level <level>` sets how the notes explain, as a kind of explanation rather than a reader's
-seniority: `onboarding` (everything `full` asks, plus where each change sits in the codebase, the
-flow it belongs to, the conventions it follows and the files to read next), `full` (nearly every
-line, every term in `terms`, every parameter), `guided` (the lines
-that carry the logic, the patterns named), `essentials` (what the code does not show by itself),
-`design` (decisions, trade-offs, alternatives and `impact`) and `big-picture` (architecture and
-consequences, no line detail). The levels before this one, `brief`, `standard` and `deep`, still
-work as `essentials`, `guided` and `full`.
+A note costs what Claude writes into it, so what it holds is chosen by purpose, not by a reader's
+seniority. Each tag names parts of a note (`hooks/parts.ts`); every note keeps its title, files,
+`tldr`, `what` and `why`:
+
+| Tag | Adds | For |
+|---|---|---|
+| `summary` | nothing more | the cheapest: what happened and why |
+| `review` (default) | `lines` a reviewer stops at, `removed`, `symbols`, `alternatives`, `impact`, `risks` | accepting a change |
+| `learn` | `lines`, `removed`, `symbols`, `uses`, `parameters`, `terms` | learning the code |
+| `decisions` | `alternatives`, `impact`, `risks` | design review |
+| `architecture` | `impact`, `risks` | the system view |
+| `onboarding` | `learn`'s parts and `impact`, and the guide in the recap | someone new to the codebase |
+| `all` | every part | the most detail, the most cost |
+
+Tags combine (`review,learn`), and their names are English in every language, like commands. The
+instructions hold only the rules of the chosen parts, and the note tool describes those parts in
+full and the others in one line ("Only when an inloop skill asks"), so Claude neither writes them
+nor reads their long descriptions with every request; `/inloop:annotate` and `/inloop:onboard`
+can still fill them. A change of tags registers the tools again, which rebuilds the prompt cache
+once. With the tools and instructions together, inloop adds about 1,600 tokens per request with
+`summary` and 3,100 with `all`, read from the cache after the first request.
+
+The levels of earlier versions map onto tags: `full` and `deep` to `all`, `guided` and `standard`
+to `review,learn`, `essentials` and `brief` to `review`, `design` to `decisions`, `big-picture` to
+`architecture`. `design` became `decisions` because "design" reads as UI and UX design.
+
+A first measurement (`bench/`, one run per task) found that the tags cut what Claude writes into
+the notes: about 300 tokens per change with `summary`, 400 to 550 with `review`, 600 to 1,300 with
+`all`. The total cost of a task varies more from run to run than the notes cost, so the totals
+need repeated runs.
 
 A note is written the way a developer who speaks its language explains code to a colleague: that
 language's sentences, with every technical word in the form developers use, which is usually
@@ -225,10 +247,10 @@ the verbs and properties around it. So:
   (Turkish "karıştır") say which meaning is meant. The sent-back call's row shows one line instead
   of a card.
 
-On the page the level is chosen in a dialog (`<dialog>`, a sheet from the bottom on a phone):
-each level with one line on what it shows, the notes' own level marked. Esc, a click outside and
-the close button shut it and give focus back to its button. A browser's own dropdown said nothing
-about the levels.
+On the page the tags are chosen in a dialog (`<dialog>`, a sheet from the bottom on a phone):
+each tag with one line on what it adds, the tags the notes were written with marked and pressed.
+`all` stands alone; any other tag turns it off. Esc, a click outside and the close button shut it
+and give focus back to its button.
 
 ### Reasons, and what happened after
 
@@ -253,7 +275,7 @@ and CI files, structure, entry points, flows, tests, history), change nothing, a
 end, then the modules a newcomer must know. Its recap is a guide: `reading_order` as the learning
 path, `setup` with commands found in the repository, `conventions`, `questions` with answers,
 `first_tasks`, and in `check_by_hand` what to ask the team. `/inloop explain` shows the guide on its
-overview and every term in a glossary view. `/inloop onboard` sets the project's level to
+overview and every term in a glossary view. `/inloop onboard` sets the project's tags to
 `onboarding`, so later changes are explained the same way.
 
 ### Explaining code that already exists

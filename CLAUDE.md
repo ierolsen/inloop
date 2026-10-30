@@ -11,7 +11,7 @@ done it calls `recap`. inloop captures every file edit with its diff and every c
 notes live, and renders the review as a file explorer: each file's code with every explanation
 beside its line, its changes commit by commit, and why each block of lines is there
 (`/inloop review`, `/inloop explain`). Notes are written in the language the user picks,
-independent of the language they chat in, at the level they choose (`/inloop level`), and in an
+independent of the language they chat in, holding what the chosen tags ask for (`/inloop tags`), and in an
 ADHD-friendly form when asked (`/inloop adhd on`).
 
 The plan is in `docs/plan.md`; design decisions and the checks behind them are in `docs/design.md`.
