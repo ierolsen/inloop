@@ -5,12 +5,13 @@ const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;'
 export const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (c) => ESCAPES[c])
 
 // One line of note text: `code spans` as code, **bold** as strong, the rest escaped. Code spans are
-// cut out first, so nothing inside them is read as bold.
+// set aside first, so nothing inside them is read as bold, while bold may still wrap one.
 export function span(text: unknown): string {
-  return String(text ?? '')
-    .split(/(`[^`\n]+`)/g)
-    .map((part, i) => (i % 2 ? '<code>' + esc(part.slice(1, -1)) + '</code>' : esc(part).replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')))
-    .join('')
+  const codes: string[] = []
+  const held = String(text ?? '').replace(/\u0000/g, '').replace(/`([^`\n]+)`/g, (_, c: string) => '\u0000' + (codes.push(c) - 1) + '\u0000')
+  return esc(held)
+    .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\u0000(\d+)\u0000/g, (_, i: string) => '<code>' + esc(codes[Number(i)]) + '</code>')
 }
 
 // Note text as Claude writes it: paragraphs, "- " bullets, "1. " steps, code spans and bold.

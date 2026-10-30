@@ -46,6 +46,7 @@ test('note text: escaped first, then code spans, bold, bullets and steps', async
   expect(span('a **b** `c **d**` <e>')).toBe('a <strong>b</strong> <code>c **d**</code> &lt;e&gt;')
   expect(rich('Lead line\n- one **x**\n- two\n\n1. first\n2. second')).toBe('<p>Lead line</p><ul><li>one <strong>x</strong></li><li>two</li></ul><ol><li>first</li><li>second</li></ol>')
   expect(rich('<script>')).toBe('<p>&lt;script&gt;</p>')
+  expect(span('the **`MedHouseVal`** column')).toBe('the <strong><code>MedHouseVal</code></strong> column')
 })
 
 const PATCH = [
@@ -75,6 +76,7 @@ test('git patches become files of numbered lines', async () => {
   const cut = clip(files[1], 3)
   expect([lineCount(cut), cut.added, cut.removed]).toEqual([3, 3, 2])
   expect(roleOf('src/models.py')).toBe('data')
+  expect(roleOf('housing/model.py')).toBe('logic') // a machine learning model is logic, Django's models.py is data
   expect(fixedOrder(['README.md', 'app.py', 'models.py']).map((x) => x.file)).toEqual(['models.py', 'app.py', 'README.md'])
 })
 
@@ -105,6 +107,10 @@ test('each explanation finds its line once: definitions, borrowed names, paramet
   expect(taken.has('n2:line:1')).toBe(false)
   expect(segments(shapeLines.length, inShapes)).toEqual([{ from: 0, to: 3, marks: [inShapes[0].mark, inShapes[1].mark] }, { from: 4, to: 4, marks: [inShapes[2].mark] }])
   expect(segments(4, [])).toEqual([{ from: 0, to: 3, marks: [] }])
+  // several names in one entry: the first that is found places it
+  const n3 = noteOf({ files: ['app.py'], uses: [{ name: 'main, largest', from: 'shapes.py', why: 'both' }], symbols: [{ name: 'nothing / Rectangle', kind: 'class', file: 'shapes.py', why_exists: 'x' }] })
+  expect(place('app.py', appLines, [{ id: 'n3', note: n3 }]).map((p) => [p.at, p.mark.kind])).toEqual([[0, 'use']])
+  expect(place('shapes.py', shapeLines, [{ id: 'n3', note: n3 }]).map((p) => [p.at, p.mark.kind])).toEqual([[0, 'symbol']])
 })
 
 // A small history: a commit with a note, a commit explained afterwards, an amended commit, a commit

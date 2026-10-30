@@ -28,8 +28,34 @@ function find(lines: (Line | null)[], used: Set<number>, test: (text: string) =>
   return null
 }
 
+// Claude sometimes names several things at once ("load, save, MODEL_PATH" or "a / b"): each part
+// is tried in turn, and the first that finds a line wins.
+const parts = (name: string) => name.split(/\s*[,/]\s*|\s+and\s+/).map((x) => x.trim()).filter(Boolean)
+
+function firstOf<T>(items: T[], each: (item: T) => number | null): number | null {
+  for (const item of items) {
+    const at = each(item)
+    if (at !== null) return at
+  }
+  return null
+}
+
+// The line naming the most of the given names, such as the import that brings them all in; ties go
+// to the search order (new lines first).
+function most(lines: (Line | null)[], used: Set<number>, names: string[]): number | null {
+  let best: number | null = null
+  let score = 0
+  for (const i of order(lines)) {
+    if (used.has(i)) continue
+    const n = names.filter((name) => word(name).test(lines[i]!.text)).length
+    if (n > score) { best = i; score = n }
+  }
+  return best
+}
+
 // The line that defines a symbol: "def area", "class Rectangle", "function largest", "area = (".
 function definition(lines: (Line | null)[], used: Set<number>, name: string): number | null {
+  if (parts(name).length > 1) return firstOf(parts(name), (part) => definition(lines, used, part))
   const last = name.split(/[.:#]+/).pop() || name
   const defines = new RegExp('(^|\\s)(?:' + DEF + ')\\s+\\*?' + escapeRe(last) + '\\b|(^|\\s)' + escapeRe(last) + '\\s*(?::\\s*[^=]+)?=\\s*(?:async\\s*)?(?:function|\\(|[A-Za-z_$][\\w$]*\\s*=>|lambda)')
   return find(lines, used, (t) => defines.test(t)) ?? find(lines, used, (t) => word(last).test(t))
@@ -42,9 +68,12 @@ export const markKey = (m: Mark) => m.note + ':' + m.kind + ':' + m.item
 export function place(path: string, lines: (Line | null)[], notes: { id: string; note: Note }[], taken = new Set<string>()): Placed[] {
   const used = new Set<number>()
   const placed: Placed[] = []
+  // Several parameters of one call share its line; only quoted line comments keep a line to
+  // themselves, so two comments quoting the same text land on its two occurrences.
+  const free = new Set<number>()
   const put = (mark: Mark, at: number | null) => {
     if (taken.has(markKey(mark)) || at === null) return
-    used.add(at)
+    if (mark.kind === 'line') used.add(at)
     taken.add(markKey(mark))
     placed.push({ at, mark })
   }
@@ -52,17 +81,17 @@ export function place(path: string, lines: (Line | null)[], notes: { id: string;
     const here = note.files.length === 0 || note.files.some((f) => sameFile(f, path) || sameFile(path, f))
     note.symbols.forEach((s, item) => {
       if (s.file ? !(sameFile(s.file, path) || sameFile(path, s.file)) : !here) return
-      put({ kind: 'symbol', note: id, item }, definition(lines, used, s.name))
+      put({ kind: 'symbol', note: id, item }, definition(lines, free, s.name))
     })
     if (!here) continue
     note.uses.forEach((u, item) => {
       // a borrowed name is explained where it is used, never in the file it comes from
       if (u.from && (sameFile(u.from, path) || sameFile(path, u.from))) return
-      put({ kind: 'use', note: id, item }, find(lines, used, (t) => word(u.name).test(t)))
+      put({ kind: 'use', note: id, item }, most(lines, free, parts(u.name)))
     })
     note.parameters.forEach((p, item) => {
       const test = /^[A-Za-z_$][\w$]*$/.test(p.name) ? (t: string) => word(p.name).test(t) : (t: string) => bare(t).includes(bare(p.name))
-      put({ kind: 'param', note: id, item }, find(lines, used, test))
+      put({ kind: 'param', note: id, item }, find(lines, free, test))
     })
     note.lines.forEach((x, item) => {
       const anchor = bare(x.anchor)

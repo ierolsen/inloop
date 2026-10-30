@@ -191,11 +191,11 @@ export function render(r: Review, l: Labels, o: Options): string {
   for (const g of r.groups) body.push(groupHtml(g, r, l, code, commits.length))
   if (r.explained) body.push(groupHtml(r.explained, r, l, code, commits.length))
   if (r.index.length) {
-    body.push('<section id="index"><h2>' + esc(l.page_index) + '</h2><p class="hint">' + esc(l.page_index_hint) + '</p><table class="index"><thead><tr><th>' +
+    body.push('<section id="index"><h2>' + esc(l.page_index) + '</h2><p class="hint">' + esc(l.page_index_hint) + '</p><div class="tablewrap"><table class="index"><thead><tr><th>' +
       esc(l.page_param_name) + '</th><th>' + esc(l.page_field_files) + '</th><th>' + esc(l.page_why_exists) + '</th><th>' + esc(l.r_where) + '</th></tr></thead><tbody>' +
       r.index.map((x) => '<tr><td><code>' + esc(x.name) + '</code> ' + badge(l[('page_kind_' + x.kind) as 'page_kind_class']) + '</td><td>' + (x.file ? '<code>' + esc(x.file) + '</code>' : '') +
         '</td><td>' + span(x.why) + '</td><td>' + (x.href ? '<a href="' + esc(x.href) + '">' + esc(short(r.groups.find((g) => g.id === x.group)?.sha ?? null) || l.r_here) + '</a>' : '') + '</td></tr>').join('') +
-      '</tbody></table></section>')
+      '</tbody></table></div></section>')
   }
   const foot = '<footer>' + esc(say(l.r_footer, { version: o.version })) + '</footer>'
   return shell(say(l.page_title, { project: r.project || 'inloop' }), code, o.theme, CSS, head + '\n<main>\n' + body.join('\n') + '\n</main>\n' + foot, SCRIPT)

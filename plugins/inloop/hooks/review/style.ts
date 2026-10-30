@@ -132,10 +132,12 @@ a.xref { color: inherit; text-decoration: underline dotted var(--accent); text-u
 a.xref:hover { color: var(--accent); }
 :target .pin, .gloss:target { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-table.index { border-collapse: collapse; width: 100%; font-size: 15px; }
+.tablewrap { overflow-x: auto; }
+table.index { border-collapse: collapse; width: 100%; font-size: 15px; table-layout: fixed; }
+table.index th:nth-child(1) { width: 30%; } table.index th:nth-child(2) { width: 20%; } table.index th:nth-child(4) { width: 9%; }
+table.index td { overflow-wrap: anywhere; }
 table.index th { text-align: left; color: var(--muted); font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--line); padding: 6px 12px 6px 0; }
 table.index td { border-bottom: 1px solid var(--line); padding: 8px 12px 8px 0; vertical-align: top; }
-table.index td:first-child { white-space: nowrap; }
 footer { color: var(--faint); font-size: 13.5px; border-top: 1px solid var(--line); margin-top: 48px; padding-top: 16px; }
 
 @media (max-width: 900px) {
@@ -152,7 +154,7 @@ footer { color: var(--faint); font-size: 13.5px; border-top: 1px solid var(--lin
   .story { grid-template-columns: 1fr; gap: 2px; }
   .story dd { margin-bottom: 8px; }
   table.index thead { display: none; }
-  table.index, table.index tbody, table.index tr, table.index td { display: block; width: 100%; }
+  table.index, table.index tbody, table.index tr, table.index td { display: block; width: 100% !important; }
   table.index tr { border-bottom: 1px solid var(--line); padding: 8px 0; }
   table.index td { border: 0; padding: 2px 0; white-space: normal !important; }
 }

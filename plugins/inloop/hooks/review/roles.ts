@@ -12,7 +12,7 @@ export function roleOf(path: string): Role {
   if (/\.(json|ya?ml|toml|ini|cfg|conf|lock)$/.test(name) || /^(dockerfile|makefile|procfile|\.gitignore|\.editorconfig|\.env\.example)$/.test(name) ||
     /\.config\.[a-z]+$/.test(name) || /(^|\/)\.github\//.test(p) || /^requirements.*\.txt$/.test(name)) return 'config'
   if (/(^|\/)(models?|schemas?|entities|migrations|types|db)\//.test(p) || /\.(sql|proto|prisma|graphql|gql|avsc)$/.test(name) ||
-    /\.d\.ts$/.test(name) || /^(models?|schemas?|types|entities)\.[a-z]+$/.test(name)) return 'data'
+    /\.d\.ts$/.test(name) || /^(models|schemas?|types|entities)\.[a-z]+$/.test(name)) return 'data'
   if (/(^|\/)(components?|views?|pages|templates|ui|screens|layouts|styles|static|public)\//.test(p) ||
     /\.(css|scss|sass|less|html?|vue|svelte|jsx|tsx|astro|erb|hbs|njk|jinja2?)$/.test(name)) return 'ui'
   if (/\.(py|js|mjs|cjs|ts|go|rs|rb|java|kt|swift|c|cc|cpp|h|hpp|cs|php|scala|ex|exs|clj|lua|sh|ps1|r|jl|dart|m|mm|zig)$/.test(name)) return 'logic'
