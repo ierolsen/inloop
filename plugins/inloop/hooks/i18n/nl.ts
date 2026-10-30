@@ -228,7 +228,7 @@ export const nl: Labels = {
   share_pr_too_long: 'Er is niets verstuurd: {path} is langer dan een reactie op GitHub mag zijn.',
   share_pr_posted: 'De inloop-reactie staat op pull request #{number}: {url}',
   share_pr_updated: 'De inloop-reactie op pull request #{number} is bijgewerkt: {url}',
-  share_not_typed: 'inloop verstuurt alleen iets als je de opdracht zelf typt, dus er is niets verstuurd.',
+  share_not_typed: 'inloop verstuurt alleen iets als je de opdracht zelf in de prompt van Claude Code typt, dus er is niets verstuurd.',
   share_bad: 'Gebruik `/inloop share`, `/inloop share <bereik>`, `/inloop share pr [nummer]` of `/inloop share pr [nummer] --yes`.',
   share_link_later: 'Delen via een link (een geheime gist) komt in een latere versie. Tot dan schrijft `/inloop share` een pagina om aan een e-mail toe te voegen, en reageert `/inloop share pr` op een pull request.',
   review_pr_no_git: 'Deze map is geen git-repository, dus er zijn geen pull requests.',

@@ -829,8 +829,9 @@ async function preview($: any, pr: Pr, l: Labels): Promise<string> {
   return said.join('\n')
 }
 
-// Origins of a command a person typed: the prompt, the remote bridge to it, or `claude -p`
-const TYPED = new Set(['composer', 'bridge', 'sdk'])
+// Origins of a command a person typed at Claude Code's prompt, or through the remote bridge to it.
+// Not `claude -p` ("sdk"): Claude itself can run that from a shell, after a preview of its own.
+const TYPED = new Set(['composer', 'bridge'])
 
 // /inloop share pr [n] [--yes]: a preview by default; with --yes, the previewed comment is posted,
 // or inloop's earlier comment there replaced, when the pull request has not moved since
@@ -875,7 +876,11 @@ async function reviewPr($: any, which: string, theme: Theme, l: Labels): Promise
   // fetch from the remote that is the pull request's repository, else from its address
   const remotes = (await gitRun($, ['git', 'remote', '-v'])).out.split('\n')
   const slug = (pr.owner + '/' + pr.repo).toLowerCase()
-  const named = remotes.map((x) => x.split(/\s+/)).find(([, url = '']) => url.toLowerCase().replace(/\.git$/, '').endsWith(slug) && url.toLowerCase().includes(pr.host.toLowerCase()))
+  // the owner and repository must be whole path parts: "noterol/shop" is not "erol/shop"
+  const named = remotes.map((x) => x.split(/\s+/)).find(([, url = '']) => {
+    const u = url.toLowerCase().replace(/\.git$/, '').replace(/\/+$/, '')
+    return u.includes(pr.host.toLowerCase()) && (u.endsWith('/' + slug) || u.endsWith(':' + slug))
+  })
   const from = named?.[0] ?? 'https://' + pr.host + '/' + pr.owner + '/' + pr.repo + '.git'
   const ref = 'refs/inloop/pr-' + pr.number
   let fetched: { ok: boolean; err: string }

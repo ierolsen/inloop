@@ -105,10 +105,10 @@ that changes nothing writes nothing.
 
 ## Privacy
 
-inloop's own code makes no network requests and no model calls. Two commands run your own tools
-for a pull request, only when you type them: `/inloop review pr` and `/inloop share pr` read it
-with `gh` and `git fetch`, and only `/inloop share pr --yes` posts anything, as you, with your own
-`gh` login. The notes are written by Claude in your session, so they cost output tokens;
+inloop's own code makes no network requests and no model calls. The pull request commands run
+your own tools: `/inloop review pr` and `/inloop share pr` read the pull request with `gh` and
+`git fetch`, and only `/inloop share pr --yes`, typed by you at Claude Code's prompt, posts
+anything, as you, with your own `gh` login. The notes are written by Claude in your session, so they cost output tokens;
 `/inloop level essentials` or `/inloop off` keep that down. Secrets are redacted before anything is written, and files that usually hold secrets, such
 as `.env` files and keys, are recorded by name only. The review page is a single file that loads
 nothing from the internet; it holds the code of the files it covers, so share it only with people

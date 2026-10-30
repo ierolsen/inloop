@@ -469,7 +469,10 @@ test('/inloop share pr shows a preview first, posts only with --yes typed by a p
   expect(posted()).toEqual([])
   // only a person may send: a command from another plugin is refused before gh is asked anything
   const asked = w.ran.length
-  expect((await $.command.run({ ...command('share pr --yes'), origin: { kind: 'plugin', name: 'other' } })).text).toBe('inloop sends something only when you type the command yourself, so nothing was sent.')
+  const REFUSED = 'inloop sends something only when you type the command yourself at Claude Code\'s prompt, so nothing was sent.'
+  expect((await $.command.run({ ...command('share pr --yes'), origin: { kind: 'plugin', name: 'other' } })).text).toBe(REFUSED)
+  // nor from `claude -p`, which Claude itself could run from a shell
+  expect((await $.command.run({ ...command('share pr --yes'), origin: { kind: 'sdk' } })).text).toBe(REFUSED)
   expect(w.ran.length).toBe(asked)
   // --yes posts the previewed text as a new comment
   const POST = 'gh api -X POST repos/erol/shop/issues/7/comments --input ' + ROOT + '/.inloop/share/pr-7.body.json --jq .html_url'
@@ -496,7 +499,8 @@ test('/inloop review pr fetches the pull request into its own ref and reviews it
   const REF = 'refs/inloop/pr-7'
   Object.assign(git, {
     'gh --version': 'gh version 2.82.0\n', [PR_VIEW + '']: prJson(B, [B]), ['gh pr view 7 --json number,title,url,headRefOid,commits']: prJson(B, [B]),
-    'git remote -v': 'origin\tgit@github.com:erol/shop.git (fetch)\norigin\tgit@github.com:erol/shop.git (push)\n',
+    // a remote whose path only ends like the pull request's repository is not it
+    'git remote -v': 'fork\thttps://github.com/noterol/shop.git (fetch)\nfork\thttps://github.com/noterol/shop.git (push)\norigin\tgit@github.com:erol/shop.git (fetch)\norigin\tgit@github.com:erol/shop.git (push)\n',
     ['git fetch --no-tags --quiet origin +refs/pull/7/head:' + REF]: '',
     ['git cat-file -s ' + REF + ':shapes.py']: SHAPES.length + '\n',
     ['git show ' + REF + ':shapes.py']: SHAPES,
@@ -504,6 +508,7 @@ test('/inloop review pr fetches the pull request into its own ref and reviews it
   const page = ROOT + '/.inloop/review/review-pr-7.html'
   expect((await $.command.run(command('review pr 7'))).text).toBe('The review is at ' + page)
   expect(w.ran).toContain('git fetch --no-tags --quiet origin +refs/pull/7/head:' + REF)
+  expect(w.ran.filter((c) => c.startsWith('git fetch'))).toEqual(['git fetch --no-tags --quiet origin +refs/pull/7/head:' + REF])
   const html = w.files.get(page) ?? ''
   expect(html).toContain('Commits in pull request #7: Add shapes')
   expect(html).toContain('area is width times height')

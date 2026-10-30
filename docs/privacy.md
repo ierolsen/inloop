@@ -31,7 +31,7 @@ plugin makes, and `claude plugin validate plugins/inloop` prints inloop's: files
 `gh`, and the command that opens a page or a folder), the session, the plugin store and the user
 interface.
 
-Only two commands use the network, through your own tools, and only when you type them:
+Only the pull request commands use the network, through your own `gh` and `git`:
 
 - **`/inloop review pr [n]`** asks `gh` about the pull request and fetches it with `git fetch`
   into one reference of its own, `refs/inloop/pr-<n>`. It only reads.
@@ -39,8 +39,9 @@ Only two commands use the network, through your own tools, and only when you typ
   there, writes the comment it would post to `.inloop/share/pr-<n>.md`, and sends nothing.
   **`/inloop share pr [n] --yes`** posts that file's text as a comment, or replaces inloop's
   earlier comment, as you, with your `gh` login. It posts only when the pull request has not
-  moved since the preview, so what you read is what is sent, and only when a person typed the
-  command: a command from another plugin, a channel or a scheduled task is refused.
+  moved since the preview, so what you read is what is sent, and only when you typed the command
+  at Claude Code's prompt: the same command from another plugin, a channel, a scheduled task or
+  `claude -p` (which Claude itself could run from a shell) is refused.
 
 Neither command ever waits for a password: `gh` and `git` run with their prompts turned off and
 fail with a message instead.

@@ -231,7 +231,7 @@ export const en = {
   share_pr_too_long: 'Nothing was sent: {path} is longer than a GitHub comment can be.',
   share_pr_posted: 'inloop\'s comment is on pull request #{number}: {url}',
   share_pr_updated: 'inloop\'s comment on pull request #{number} is updated: {url}',
-  share_not_typed: 'inloop sends something only when you type the command yourself, so nothing was sent.',
+  share_not_typed: 'inloop sends something only when you type the command yourself at Claude Code\'s prompt, so nothing was sent.',
   share_bad: 'Use `/inloop share`, `/inloop share <range>`, `/inloop share pr [number]` or `/inloop share pr [number] --yes`.',
   share_link_later: 'Sharing by link (a secret gist) comes in a later version. For now, `/inloop share` writes a page to attach to an email, and `/inloop share pr` comments on a pull request.',
   review_pr_no_git: 'This folder is not a git repository, so it has no pull requests.',

@@ -228,7 +228,7 @@ export const de: Labels = {
   share_pr_too_long: 'Nichts wurde gesendet: {path} ist länger, als ein GitHub-Kommentar sein darf.',
   share_pr_posted: 'Der inloop-Kommentar steht im Pull Request #{number}: {url}',
   share_pr_updated: 'Der inloop-Kommentar im Pull Request #{number} ist aktualisiert: {url}',
-  share_not_typed: 'inloop sendet nur, wenn du den Befehl selbst eingibst, daher wurde nichts gesendet.',
+  share_not_typed: 'inloop sendet nur, wenn du den Befehl selbst in die Eingabe von Claude Code tippst, daher wurde nichts gesendet.',
   share_bad: 'Nutze `/inloop share`, `/inloop share <Bereich>`, `/inloop share pr [Nummer]` oder `/inloop share pr [Nummer] --yes`.',
   share_link_later: 'Teilen per Link (ein geheimer Gist) kommt in einer späteren Version. Bis dahin schreibt `/inloop share` eine Seite zum Anhängen an eine E-Mail, und `/inloop share pr` kommentiert einen Pull Request.',
   review_pr_no_git: 'Dieser Ordner ist kein git-Repository, daher hat er keine Pull Requests.',

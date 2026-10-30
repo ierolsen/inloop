@@ -147,7 +147,10 @@ mean shipping a key in a plugin.
   joiner so nobody is notified. The level hides what the page would hide.
   - A plain run writes the comment to `.inloop/share/pr-<n>.md`, with the pull request's head in
     `pr-<n>.json`, and only reads from GitHub. `--yes` posts that file's text only when the head
-    is unchanged and the command was typed by a person (origin `composer`, `bridge` or `sdk`).
+    is unchanged and the command was typed at Claude Code's prompt (origin `composer`, or
+    `bridge` for the remote prompt). `claude -p` (origin `sdk`) is refused: Claude could run it
+    from its shell tool, after a preview of its own. A plugin command cannot be run by Claude
+    through its tools (checked with a probe command on 2.1.310).
   - The comment starts with `<!-- inloop -->`. inloop's earlier comment is the one by the same
     login that starts with it (`gh api ... --jq`), and is replaced (PATCH) rather than joined by
     another; `gh pr comment --edit-last` would edit whatever the person wrote last.

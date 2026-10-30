@@ -229,7 +229,7 @@ export const tr: Labels = {
   share_pr_too_long: 'Hiçbir şey gönderilmedi: {path}, bir GitHub yorumunun alabileceğinden uzun.',
   share_pr_posted: 'inloop yorumu #{number} numaralı pull request\'te: {url}',
   share_pr_updated: '#{number} numaralı pull request\'teki inloop yorumu güncellendi: {url}',
-  share_not_typed: 'inloop yalnızca komutu sen yazdığında bir şey gönderir; hiçbir şey gönderilmedi.',
+  share_not_typed: 'inloop yalnızca komutu Claude Code\'un istemine sen yazdığında bir şey gönderir; hiçbir şey gönderilmedi.',
   share_bad: '`/inloop share`, `/inloop share <aralık>`, `/inloop share pr [numara]` ya da `/inloop share pr [numara] --yes` kullan.',
   share_link_later: 'Link ile paylaşım (gizli gist) sonraki bir sürümde gelecek. Şimdilik `/inloop share` e-postaya eklenecek bir sayfa yazar, `/inloop share pr` de pull request\'e yorum yazar.',
   review_pr_no_git: 'Bu klasör bir git reposu değil, bu yüzden pull request\'i yok.',
