@@ -24,7 +24,7 @@ export const de: Labels = {
     '  /inloop lang <Sprache>        die Sprache der Notizen und Seiten, für alle Projekte',
     '  /inloop lang <Sprache> --project    dasselbe, nur für dieses Projekt',
     '  /inloop lang reset [--project]       zurück zur Plugin-Einstellung (mit --project entfällt nur die Wahl dieses Projekts)',
-    '  /inloop level <Stufe> [--project]   wie die Notizen erklären: full, guided, essentials, design, big-picture',
+    '  /inloop level <Stufe> [--project]   wie die Notizen erklären: onboarding, full, guided, essentials, design, big-picture',
     '  /inloop level reset [--project]      zurück zur Plugin-Einstellung',
     '  /inloop adhd on | off [--project]    leicht lesbare Notizen: das Wichtigste zuerst, kurze Zeilen, jeder Begriff erklärt',
     '  /inloop on | off              Notizen in dieser Sitzung ein- oder ausschalten',
@@ -101,7 +101,8 @@ export const de: Labels = {
   level_project: 'Erklärstufe ab jetzt, in diesem Projekt: {level}.',
   level_reset: 'Die Erklärstufe ist wieder {level} ({source}).',
   level_project_wins: 'Dieses Projekt hat eine eigene Wahl, {level}, die hier Vorrang hat; /inloop level reset --project entfernt sie.',
-  level_bad: 'Die Stufen sind full, guided, essentials, design und big-picture.',
+  level_bad: 'Die Stufen sind onboarding, full, guided, essentials, design und big-picture.',
+  level_onboarding: 'Onboarding',
   level_full: 'vollständige Erklärung',
   level_guided: 'geführt',
   level_essentials: 'das Wesentliche',
@@ -239,4 +240,14 @@ export const de: Labels = {
   // outcomes after a change
   r_outcome: 'Ergebnis',
   card_outcomes: 'Ergebnisse',
+
+  // the level chooser
+  x_level_title: 'Erklärstufe',
+  x_level_written: 'Stufe der Notizen',
+  x_level_desc_onboarding: 'Für Neue im Team: jede Zeile, und wo sie im Code steht.',
+  x_level_desc_full: 'Fast jede Zeile und jeder Begriff erklärt.',
+  x_level_desc_guided: 'Die Zeilen mit der Logik und die Muster dahinter.',
+  x_level_desc_essentials: 'Was und warum, nur was der Code nicht selbst zeigt.',
+  x_level_desc_design: 'Entscheidungen, Trade-offs und was sie sonst berühren.',
+  x_level_desc_big_picture: 'Architektur und langfristige Folgen, ohne Zeilendetails.',
 }

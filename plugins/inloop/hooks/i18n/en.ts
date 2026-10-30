@@ -26,7 +26,7 @@ export const en = {
     '  /inloop lang <language>       the language of notes and pages, for all your projects',
     '  /inloop lang <language> --project    the same, for this project only',
     '  /inloop lang reset [--project]       back to the plugin setting (with --project, only this project\'s choice goes)',
-    '  /inloop level <level> [--project]   how notes explain: full, guided, essentials, design, big-picture',
+    '  /inloop level <level> [--project]   how notes explain: onboarding, full, guided, essentials, design, big-picture',
     '  /inloop level reset [--project]      back to the plugin setting',
     '  /inloop adhd on | off [--project]    notes for easy reading: the point first, short lines, every term explained',
     '  /inloop on | off              ask Claude for notes, or stop asking, in this session',
@@ -103,7 +103,8 @@ export const en = {
   level_project: 'From now on inloop notes explain at the level "{level}", in this project.',
   level_reset: 'inloop notes explain at the level "{level}" again ({source}).',
   level_project_wins: 'This project has its own choice, "{level}", which comes first here; /inloop level reset --project removes it.',
-  level_bad: 'The levels are full, guided, essentials, design and big-picture.',
+  level_bad: 'The levels are onboarding, full, guided, essentials, design and big-picture.',
+  level_onboarding: 'onboarding',
   level_full: 'full explanation',
   level_guided: 'guided',
   level_essentials: 'key points',
@@ -242,6 +243,16 @@ export const en = {
   // outcomes after a change
   r_outcome: 'Outcome',
   card_outcomes: 'Outcomes',
+
+  // the level chooser
+  x_level_title: 'Level of detail',
+  x_level_written: 'the notes\' level',
+  x_level_desc_onboarding: 'For someone who just joined: every line, and where it sits in the codebase.',
+  x_level_desc_full: 'Nearly every line and every term explained.',
+  x_level_desc_guided: 'The lines that carry the logic, and the patterns behind them.',
+  x_level_desc_essentials: 'What and why, only what the code does not show by itself.',
+  x_level_desc_design: 'Decisions, trade-offs and what else they affect.',
+  x_level_desc_big_picture: 'Architecture and long-term consequences, no line detail.',
 }
 
 export type Labels = typeof en

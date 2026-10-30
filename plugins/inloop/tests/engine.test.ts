@@ -130,7 +130,7 @@ test('/inloop lang and level change the next instructions, for all projects or f
   expect(await written()).toContain('Level "guided"')
   expect((await $.command.run(command('level full'))).text).toBe('From now on inloop notes explain at the level "full explanation", in all your projects.')
   expect(await written()).toContain('Level "full explanation"')
-  expect((await $.command.run(command('level loud'))).text).toBe('The levels are full, guided, essentials, design and big-picture.')
+  expect((await $.command.run(command('level loud'))).text).toBe('The levels are onboarding, full, guided, essentials, design and big-picture.')
   expect((await $.command.run(command('status'))).text).toContain('Notes are in English (the plugin setting), level full explanation (your setting for all projects), ADHD-friendly off (the plugin setting).')
   // the first builds' command and values still work
   expect((await $.command.run(command('detail brief'))).text).toBe('From now on inloop notes explain at the level "key points", in all your projects.')

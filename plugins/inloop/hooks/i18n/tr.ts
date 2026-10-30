@@ -25,7 +25,7 @@ export const tr: Labels = {
     '  /inloop lang <dil>            notların ve sayfaların dili, tüm projeler için',
     '  /inloop lang <dil> --project  aynısı, yalnızca bu proje için',
     '  /inloop lang reset [--project]       eklenti ayarına dönüş (--project ile yalnızca bu projenin seçimi kalkar)',
-    '  /inloop level <seviye> [--project]  anlatım seviyesi: full, guided, essentials, design, big-picture',
+    '  /inloop level <seviye> [--project]  anlatım seviyesi: onboarding, full, guided, essentials, design, big-picture',
     '  /inloop level reset [--project]      eklenti ayarına dönüş',
     '  /inloop adhd on | off [--project]    kolay okunan notlar: önce asıl nokta, kısa satırlar, her terim açıklanır',
     '  /inloop on | off              bu oturumda notları açar ya da kapatır',
@@ -102,7 +102,8 @@ export const tr: Labels = {
   level_project: 'Anlatım seviyesi bundan sonra bu projede: {level}.',
   level_reset: 'Anlatım seviyesi yeniden {level} ({source}).',
   level_project_wins: 'Bu projenin kendi seçimi var ({level}) ve burada o geçerli; /inloop level reset --project onu kaldırır.',
-  level_bad: 'Seviyeler: full, guided, essentials, design ve big-picture.',
+  level_bad: 'Seviyeler: onboarding, full, guided, essentials, design ve big-picture.',
+  level_onboarding: 'onboarding',
   level_full: 'tam anlatım',
   level_guided: 'rehberli',
   level_essentials: 'ana noktalar',
@@ -240,4 +241,14 @@ export const tr: Labels = {
   // outcomes after a change
   r_outcome: 'Sonuç',
   card_outcomes: 'Sonuçlar',
+
+  // the level chooser
+  x_level_title: 'Anlatım seviyesi',
+  x_level_written: 'notların seviyesi',
+  x_level_desc_onboarding: 'Projeye yeni katılan için: her satır ve kodun projedeki yeri.',
+  x_level_desc_full: 'Neredeyse her satır ve her terim açıklanır.',
+  x_level_desc_guided: 'Logic\'i taşıyan satırlar ve arkalarındaki pattern\'ler.',
+  x_level_desc_essentials: 'Ne ve neden; yalnızca kodun kendisinin göstermedikleri.',
+  x_level_desc_design: 'Kararlar, trade-off\'lar ve etkiledikleri yerler.',
+  x_level_desc_big_picture: 'Mimari ve uzun vadeli sonuçlar; satır ayrıntısı yok.',
 }

@@ -7,7 +7,7 @@ import type { Level } from '../config.ts'
 const LIGHT = `
   --bg: #f6f5f1; --panel: #ffffff; --ink: #1f1d1a; --muted: #67625a; --faint: #8f897f;
   --line: #e3dfd6; --accent: #2c6a5a; --accent-soft: #e2eee8; --on-accent: #ffffff;
-  --why: #fff5d9; --why-line: #e3c25f; --shadow: rgba(31, 29, 26, .12);
+  --why: #fff5d9; --why-line: #e3c25f; --shadow: rgba(31, 29, 26, .12); --scrim: rgba(31, 29, 26, .38);
   --outcome: #e8f1fb; --outcome-line: #7ea6d8;
   --add: #e9f6ec; --add-ink: #1b6630; --add-gutter: #d3ecd9; --del: #fcecea; --del-ink: #962a1d; --del-gutter: #f6d6d1;
   --warn: #fcf0e1; --warn-ink: #7f4508; --code: #fbfaf7; --code-line: #efece5;
@@ -16,7 +16,7 @@ const LIGHT = `
 const DARK = `
   --bg: #151412; --panel: #1d1c19; --ink: #ebe7df; --muted: #a8a297; --faint: #78736a;
   --line: #312f2a; --accent: #8ccab5; --accent-soft: #1d2e28; --on-accent: #10201b;
-  --why: #2b2516; --why-line: #7d682b; --shadow: rgba(0, 0, 0, .5);
+  --why: #2b2516; --why-line: #7d682b; --shadow: rgba(0, 0, 0, .5); --scrim: rgba(0, 0, 0, .6);
   --outcome: #172231; --outcome-line: #4f74a3;
   --add: #15291b; --add-ink: #9be0ae; --add-gutter: #1c3524; --del: #331a19; --del-ink: #f2a79d; --del-gutter: #43211f;
   --warn: #2d2215; --warn-ink: #efc287; --code: #191816; --code-line: #262420;
@@ -26,6 +26,7 @@ const DARK = `
 // What each level hides of notes written in more detail: the page can leave detail out, never add
 // what was not written. The parts are classes on explanations, their pins and parts of a note.
 export const HIDDEN_AT: Record<Level, string[]> = {
+  'onboarding': [],
   'full': [],
   'guided': [],
   'essentials': ['param', 'use', 'terms'],
@@ -72,7 +73,28 @@ strong { font-weight: 650; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 .tools > button, .tools select { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .tools > button:hover, .seg button:hover, .tools select:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
-.lvl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.lvl-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+.lvl-btn:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
+.lvl-btn .k { color: var(--muted); }
+.lvl-btn .v { font-weight: 600; }
+.lvl-btn .chev { width: 12px; height: 12px; color: var(--muted); }
+/* the level chooser: a dialog over the page, a sheet from the bottom on a phone */
+.lvl-modal { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--panel); color: var(--ink); box-shadow: 0 24px 64px var(--shadow); }
+.lvl-modal::backdrop { background: var(--scrim, rgba(0, 0, 0, .4)); }
+.lvl-in { padding: 18px 20px 20px; }
+.lvl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 6px; }
+.lvl-head h2 { font-size: 19px; margin: 0; }
+.lvl-head .x { font: inherit; font-size: 22px; line-height: 1; color: var(--muted); background: transparent; border: 0; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
+.lvl-head .x:hover { background: var(--accent-soft); color: var(--ink); }
+.lvl-modal .hint { margin: 0 0 14px; font-size: 13.5px; }
+ul.lvl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+ul.lvl-list button { width: 100%; text-align: left; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; }
+ul.lvl-list button:hover { border-color: var(--accent); }
+ul.lvl-list button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+ul.lvl-list button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
+ul.lvl-list .n { font-weight: 650; }
+ul.lvl-list .badge { justify-self: end; }
+ul.lvl-list .d { grid-column: 1 / -1; color: var(--muted); font-size: 13.5px; }
 .drawer-btn, .drawer-close { display: none; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; background: var(--panel); }
 .drawer-toggle { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
 .scrim { display: none; }
@@ -330,7 +352,9 @@ ${levels}
   table.files th.name { width: 55%; }
 }
 @media (max-width: 600px) {
-  .mode, .tools > button { display: none; }
+  .mode, .tools > button:not(.lvl-btn) { display: none; }
+  .lvl-btn .k { display: none; }
+  .lvl-modal { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 14px 14px 0 0; max-height: 85vh; }
   .drawer-btn { padding: 5px 8px; }
   .drawer-btn .t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .seg button { padding: 5px 8px; }
@@ -348,7 +372,7 @@ ${levels}
 }
 @media print {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .appbar, .side, nav.tabs, .cnav, .drawer-toggle, .findrow { display: none !important; }
+  .appbar, .side, nav.tabs, .cnav, .drawer-toggle, .findrow, .lvl-modal { display: none !important; }
   .app { display: block; }
   .views { padding: 0; }
   html.print-all .view[data-in-print] { display: block !important; break-before: page; }
@@ -400,11 +424,33 @@ export const SCRIPT = `
   }
   window.addEventListener('hashchange', show);
 
-  var level = document.querySelector('[data-level-choice]');
-  if (level) {
-    level.value = d.getAttribute('data-level') || 'guided';
-    level.addEventListener('change', function () { d.setAttribute('data-level', level.value); });
+  // the level chooser: opens over the page; choosing a level hides what it leaves out
+  var levels = document.getElementById('levels');
+  var opener = document.querySelector('[data-level-open]');
+  function markLevel() {
+    var now = d.getAttribute('data-level');
+    all('[data-level-choice]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-level-choice') === now)); });
+    var chosen = document.querySelector('[data-level-choice="' + now + '"] .n');
+    var name = document.querySelector('[data-level-name]');
+    if (chosen && name) name.textContent = chosen.textContent;
   }
+  if (levels && opener && levels.showModal) {
+    opener.addEventListener('click', function () {
+      levels.showModal();
+      var on = levels.querySelector('[aria-pressed="true"]');
+      if (on) on.focus();
+    });
+    levels.addEventListener('click', function (e) {
+      if (e.target === levels || up(e.target, '[data-level-close]')) { levels.close(); return; }
+      var pick = up(e.target, '[data-level-choice]');
+      if (pick) {
+        d.setAttribute('data-level', pick.getAttribute('data-level-choice'));
+        markLevel();
+        levels.close();
+      }
+    });
+    levels.addEventListener('close', function () { opener.focus(); });
+  } else if (opener) opener.hidden = true;
 
   // "Go to file": the tree keeps the files whose path holds the letters typed, in order
   var find = document.querySelector('.find');
@@ -444,7 +490,7 @@ export const SCRIPT = `
     });
   }
   document.addEventListener('keydown', function (e) {
-    if (e.key !== 't' || e.metaKey || e.ctrlKey || e.altKey || !find) return;
+    if (e.key !== 't' || e.metaKey || e.ctrlKey || e.altKey || !find || (levels && levels.open)) return;
     var t = e.target;
     if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
     e.preventDefault();
@@ -467,6 +513,7 @@ export const SCRIPT = `
   });
   window.addEventListener('afterprint', function () { d.classList.remove('print-all'); });
   markTheme();
+  markLevel();
   show();
 })();
 `

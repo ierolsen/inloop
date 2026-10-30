@@ -205,3 +205,9 @@ test('word-for-word translations of technical terms are found in a note\'s prose
   expect(said).toContain('"karıştırıp" -> shuffle (when it means shuffling rows or items)')
   expect(said).toContain('Call `mcp__inloop__note` again with the same note')
 })
+
+test('the onboarding level is the most detailed, and is found by its other names', async () => {
+  expect(level('onboard')).toBe('onboarding')
+  expect(level('Onboarding')).toBe('onboarding')
+  expect(resolve({ project: { level: 'onboarding' } }).level).toEqual({ value: 'onboarding', source: 'project' })
+})

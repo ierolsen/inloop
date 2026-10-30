@@ -2,10 +2,11 @@
 // whether they are written in the ADHD-friendly form.
 // Plain module: no mods API calls here (see CLAUDE.md).
 
-// From explaining every line to a reader new to the code, to the architecture for one who looks at
-// the whole system. Named for the kind of explanation, not for the reader's job title.
-export type Level = 'full' | 'guided' | 'essentials' | 'design' | 'big-picture'
-export const LEVELS: Level[] = ['full', 'guided', 'essentials', 'design', 'big-picture']
+// From onboarding a developer who just joined (every line, and where it sits in the codebase) to
+// the architecture for one who looks at the whole system. Named for the kind of explanation, not
+// for the reader's job title. In order: each level explains less than the one before it.
+export type Level = 'onboarding' | 'full' | 'guided' | 'essentials' | 'design' | 'big-picture'
+export const LEVELS: Level[] = ['onboarding', 'full', 'guided', 'essentials', 'design', 'big-picture']
 export type Source = 'project' | 'user' | 'plugin' | 'default'
 
 export type Language = {
@@ -57,7 +58,7 @@ const LANGUAGES: [string, string, string, string[]][] = [
 ]
 
 // The detail values of the first builds, and other ways people type a level
-const ALIASES: Record<string, Level> = { brief: 'essentials', standard: 'guided', deep: 'full', bigpicture: 'big-picture', big: 'big-picture', architecture: 'big-picture', key: 'essentials', keypoints: 'essentials' }
+const ALIASES: Record<string, Level> = { brief: 'essentials', standard: 'guided', deep: 'full', bigpicture: 'big-picture', big: 'big-picture', architecture: 'big-picture', key: 'essentials', keypoints: 'essentials', onboard: 'onboarding', newcomer: 'onboarding' }
 
 // "Türkçe" -> "turkce": lower case, accents and separators removed, so any spelling matches
 export function fold(text: string): string {

@@ -377,3 +377,14 @@ test('what was found after a change shows under its note, with the reason, in th
   expect(markdown(build(source({ records: [...OUTCOME_RECORDS(), after] })), labels('en'), { code: 'en', level: 'full', version: '0.1.0', marker: false, max: COMMENT_MAX, command: '/inloop share', made: 1 }).text)
     .toContain('**Outcome**\n\n- The tests pass: **4 of 4**.')
 })
+
+test('a dialog chooses the level: every level with what it shows, the notes\' own level marked', async () => {
+  const r = build(source())
+  const html = render(r, explore(r, STATES as any, INFO), labels('tr'), OPTIONS)
+  expect(html).toContain('<button type="button" class="lvl-btn" data-level-open aria-haspopup="dialog"><span class="k">Seviye:</span> <span class="v" data-level-name>rehberli</span>')
+  expect(html).toContain('<dialog class="lvl-modal" id="levels" aria-labelledby="levels-title">')
+  expect(html.split('<dialog')[1].split('</dialog>')[0].match(/data-level-choice="/g)?.length).toBe(6)
+  expect(html).toContain('<button type="button" data-level-choice="guided" aria-pressed="true"><span class="n">rehberli</span><span class="badge new">notların seviyesi</span>')
+  expect(html).toContain('<button type="button" data-level-choice="onboarding" aria-pressed="false"><span class="n">onboarding</span><span class="d">Projeye yeni katılan için')
+  expect(html).not.toContain('<select')
+})

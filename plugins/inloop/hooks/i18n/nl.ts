@@ -24,7 +24,7 @@ export const nl: Labels = {
     '  /inloop lang <taal>           de taal van notities en pagina\'s, voor al je projecten',
     '  /inloop lang <taal> --project hetzelfde, alleen voor dit project',
     '  /inloop lang reset [--project]       terug naar de plugin-instelling (met --project vervalt alleen de keuze van dit project)',
-    '  /inloop level <niveau> [--project]  hoe de notities uitleggen: full, guided, essentials, design, big-picture',
+    '  /inloop level <niveau> [--project]  hoe de notities uitleggen: onboarding, full, guided, essentials, design, big-picture',
     '  /inloop level reset [--project]      terug naar de plugin-instelling',
     '  /inloop adhd on | off [--project]    makkelijk leesbare notities: de kern eerst, korte regels, elke term uitgelegd',
     '  /inloop on | off              notities in deze sessie aan- of uitzetten',
@@ -101,7 +101,8 @@ export const nl: Labels = {
   level_project: 'Uitlegniveau vanaf nu, in dit project: {level}.',
   level_reset: 'Het uitlegniveau is weer {level} ({source}).',
   level_project_wins: 'Dit project heeft een eigen keuze, {level}, die hier voorgaat; /inloop level reset --project haalt die weg.',
-  level_bad: 'De niveaus zijn full, guided, essentials, design en big-picture.',
+  level_bad: 'De niveaus zijn onboarding, full, guided, essentials, design en big-picture.',
+  level_onboarding: 'onboarding',
   level_full: 'volledige uitleg',
   level_guided: 'begeleid',
   level_essentials: 'de kern',
@@ -239,4 +240,14 @@ export const nl: Labels = {
   // outcomes after a change
   r_outcome: 'Resultaat',
   card_outcomes: 'Resultaten',
+
+  // the level chooser
+  x_level_title: 'Uitlegniveau',
+  x_level_written: 'niveau van de notities',
+  x_level_desc_onboarding: 'Voor wie net begint: elke regel, en waar die in de codebase zit.',
+  x_level_desc_full: 'Bijna elke regel en elke term uitgelegd.',
+  x_level_desc_guided: 'De regels met de logica, en de patronen erachter.',
+  x_level_desc_essentials: 'Wat en waarom, alleen wat de code zelf niet laat zien.',
+  x_level_desc_design: 'Beslissingen, trade-offs en wat ze verder raken.',
+  x_level_desc_big_picture: 'Architectuur en gevolgen op lange termijn, zonder regeldetails.',
 }

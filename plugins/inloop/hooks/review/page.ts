@@ -459,11 +459,22 @@ function appbar(c: Ctx): string {
   const { r, l, o } = c
   const theme = '<span class="seg" role="group" aria-label="' + esc(l.r_theme) + '">' + (['auto', 'light', 'dark'] as const).map((t) =>
     '<button type="button" data-theme-choice="' + t + '">' + esc(l[('r_theme_' + t) as 'r_theme_auto']) + '</button>').join('') + '</span>'
-  const level = '<label class="lvl"><span>' + esc(l.x_level) + '</span><select data-level-choice title="' + esc(say(o.written ? l.x_level_hint : l.x_level_hint_setting, { level: levelName(l, o.level) })) + '">' +
-    LEVELS.map((v) => '<option value="' + v + '"' + (v === o.level ? ' selected' : '') + '>' + esc(levelName(l, v)) + '</option>').join('') + '</select></label>'
+  const level = '<button type="button" class="lvl-btn" data-level-open aria-haspopup="dialog"><span class="k">' + esc(l.x_level) + ':</span> <span class="v" data-level-name>' +
+    esc(levelName(l, o.level)) + '</span><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
   return '<header class="appbar"><label class="drawer-btn" for="drawer">' + ICON_MENU + '<span class="t">' + esc(l.x_files) + '</span></label><div class="brand"><a class="logo" href="#overview">inloop</a><span class="mode">' +
     esc(o.mode === 'explain' ? l.x_explain : l.x_review) + '</span><span class="proj">' + esc(r.project) + '</span></div><div class="tools">' + level + theme +
     '<button type="button" data-print>' + esc(l.r_print) + '</button><button type="button" data-print-all>' + esc(l.x_print_all) + '</button></div></header>'
+}
+
+// The levels to choose from, each with what it shows; the notes' own level is marked. Choosing one
+// hides what it leaves out, it never adds what the notes do not hold.
+function levelDialog(c: Ctx): string {
+  const { l, o } = c
+  const items = LEVELS.map((v) => '<li><button type="button" data-level-choice="' + v + '" aria-pressed="' + String(v === o.level) + '"><span class="n">' + esc(levelName(l, v)) + '</span>' +
+    (o.written && v === o.level ? badge(l.x_level_written, 'new') : '') + '<span class="d">' + esc(l[('x_level_desc_' + v.replace('-', '_')) as 'x_level_desc_full']) + '</span></button></li>')
+  return '\n<dialog class="lvl-modal" id="levels" aria-labelledby="levels-title"><div class="lvl-in"><div class="lvl-head"><h2 id="levels-title">' + esc(l.x_level_title) + '</h2>' +
+    '<button type="button" class="x" data-level-close aria-label="' + esc(l.x_close) + '">&times;</button></div>' + hint(say(o.written ? l.x_level_hint : l.x_level_hint_setting, { level: levelName(l, o.level) })) +
+    '<ul class="lvl-list">' + items.join('') + '</ul></div></dialog>'
 }
 
 // The tree: folders open, a folder holding only one folder shown as one line (as GitHub does)
@@ -547,7 +558,7 @@ export function render(r: Review, x: Explorer, l: Labels, o: Options, trim: Trim
   const known = (id: string) => id === 'overview' || id === 'd-root' || shown.has(id) || x.files.some((p) => p.id === id) || (id.startsWith('d-') && folders(x.root).some((n) => dirId(n.path) === id))
   const start = o.start && known(o.start) ? o.start : 'overview'
   const foot = '<footer>inloop ' + esc(o.version) + ' &middot; <code>' + esc(o.command) + '</code> &middot; ' + esc(when(o.made, o.code)) + '</footer>'
-  const body = appbar(c) + '\n<input type="checkbox" id="drawer" class="drawer-toggle" aria-hidden="true" tabindex="-1"><label class="scrim" for="drawer" aria-hidden="true"></label>\n<div class="app">' + sidebar(c) +
+  const body = appbar(c) + levelDialog(c) + '\n<input type="checkbox" id="drawer" class="drawer-toggle" aria-hidden="true" tabindex="-1"><label class="scrim" for="drawer" aria-hidden="true"></label>\n<div class="app">' + sidebar(c) +
     '<main class="views">\n' + views.filter(Boolean).join('\n') + '\n' + foot + '</main></div>'
   return shell(say(l.page_title, { project: r.project || 'inloop' }), o.code, o.theme, CSS + startCss(start), body, SCRIPT, { 'data-level': o.level, 'data-start': start })
 }
