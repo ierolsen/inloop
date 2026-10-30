@@ -27,7 +27,7 @@ export function redact(text: string): { text: string; count: number } {
   for (const pattern of TOKENS) out = out.replace(pattern, () => { count++; return REDACTED })
   out = out.replace(ASSIGNMENT, (whole, name: string, eq: string, quote: string, value: string) => {
     // every value of a secret's name goes, even one that only says where the secret is kept: a
-    // shape that looks like a reference can be a secret too (Admin.PASS123)
+    // value shaped like a reference (Name.CONSTANT) can be a secret too
     if (value === REDACTED || /^(true|false|null|none|undefined)$/i.test(value)) return whole
     count++
     return name + eq + quote + REDACTED + quote

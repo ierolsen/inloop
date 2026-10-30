@@ -168,7 +168,8 @@ test('secrets are redacted and secret files are named only', async () => {
   expect(r.text).toContain('port = 8080')
   expect(r.count).toBe(4)
   // every value of a secret's name goes, references included: a reference's shape can hide a secret
-  for (const gone of ['api_key = settings.OPENAI_API_KEY', 'token = vault.read(', 'password: Admin.PASS123', 'token=abc123.XYZ789', 'password = "settings.API_KEY"']) expect([gone, redact(gone).count]).toEqual([gone, 1])
+  const shaped = 'Xx.' + 'X'.repeat(8) // made up here: a value shaped like Name.CONSTANT
+  for (const gone of ['api_key = settings.OPENAI_API_KEY', 'token = vault.read(', 'password: ' + shaped, 'token=' + shaped, 'password = "settings.API_KEY"']) expect([gone, redact(gone).count]).toEqual([gone, 1])
   expect(redact('api_token = undefined').count).toBe(0)
   expect(redact('-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----').text).toBe(REDACTED)
   expect(redactDeep({ a: ['sk-' + 'c'.repeat(30)], b: 2 })).toEqual({ value: { a: [REDACTED], b: 2 }, count: 1 })
