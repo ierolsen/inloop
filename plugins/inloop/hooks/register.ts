@@ -10,19 +10,21 @@ import { SCHEMA, DIR, LOG_DIR, REVIEW_DIR, CONFIG, PART_BYTES, line, parse, part
 import { nul, porcelain, unaccounted, state, hunks, counts, inloopOwn, OUTSIDE_MAX } from './outside.ts'
 import { labels, hasLabels, say, count, nameOf, shownIn } from './i18n/index.ts'
 import type { Labels } from './i18n/en.ts'
-import { build, titleOf } from './review/model.ts'
-import { fit, sessions as sessionList, type SessionRow } from './review/render.ts'
+import { build as buildReview, type GitCommit, type FileData } from './review/review.ts'
+import { fit as fitReview } from './review/page.ts'
+import { parsePatch, added, clip, lineCount } from './review/patch.ts'
+import type { Theme } from './review/html.ts'
 import { noteCard, recapCard } from './live/card.ts'
-import { steps, paneView, shown, type Step } from './live/pane.ts'
 
 const PLUGIN = 'inloop'
 const VERSION = '0.1.0'
 const SECTION = PLUGIN + ':instructions'
 const READ_MAX = 1_000_000 // bytes of a file read for a diff; larger files are logged without one
 const DIFF_LINES = 400
-const SESSIONS_MAX = 20 // sessions on the list /inloop open all writes
+const REVIEW_COMMITS = 30 // commits on one review page; older ones in the range are counted, not shown
+const FILE_LINES = 400 // a file's diff past this many lines is fetched again with less context
+const UNTRACKED_MAX = 30 // files not in git yet that a review reads
 const COMMITS_MAX = 50 // commits recorded from one move of HEAD
-const PANE = 'inloop' // the pane's id
 const NOTHING_OUTSIDE = '[[],0]' // fingerprint() of an empty list: where every baseline starts
 
 type Snapshot = { text: string; exists: boolean; skipped: Skipped | null }
@@ -56,10 +58,6 @@ let logged = new Set<string>() // files with an edit in this session's log
 let lastOutside = NOTHING_OUTSIDE
 let tally = { notes: 0, edits: 0, unexplained: 0, outside: 0 }
 let turnTally = { notes: 0, edits: 0, unexplained: 0 }
-let paneOpen = false
-let paneIndex: number | null = null // the step the pane shows; null follows the newest
-let revision = 0 // moves with every record, so the pane works out its steps again only then
-let paneCache: { revision: number; list: Step[] } = { revision: -1, list: [] }
 let numbers = new Map<string, number>() // a note's tool_use_id to its number, for its card
 
 function reset() {
@@ -89,10 +87,6 @@ function reset() {
   lastOutside = NOTHING_OUTSIDE
   tally = { notes: 0, edits: 0, unexplained: 0, outside: 0 }
   turnTally = { notes: 0, edits: 0, unexplained: 0 }
-  paneOpen = false
-  paneIndex = null
-  revision = 0
-  paneCache = { revision: -1, list: [] }
   numbers = new Map()
 }
 
@@ -130,8 +124,6 @@ async function append($: any, record: LogRecord) {
   }
   records.push(record)
   partSize += size
-  revision++
-  if (paneOpen) await redraw($)
   if (!stored && !recordsSomething(record)) return
   if (!stored) {
     await keepOutOfGit($)
@@ -388,60 +380,10 @@ async function start($: any) {
   ready = true
 }
 
-// ---- the live view ----------------------------------------------------------------------------
-
-// Draws the pane again after a change, while it is open
-async function redraw($: any) {
-  try {
-    await $.ui.invalidate('ui.render')
-  } catch {
-    // the pane catches up at its next drawing
-  }
-}
-
-function paneSteps(): Step[] {
-  if (paneCache.revision !== revision) paneCache = { revision, list: steps(build(records)) }
-  return paneCache.list
-}
-
-async function closePane($: any) {
-  paneOpen = false
-  try {
-    await $.ui.close({ id: PANE })
-  } catch {
-    // closed already
-  }
-}
-
-async function pageFromPane($: any, l: Labels) {
-  try {
-    await $.ui.toast(await openReview($, false, l))
-  } catch {
-    // /inloop open still writes the page
-  }
-}
-
-async function openPane($: any, l: Labels): Promise<string> {
-  paneIndex = null
-  try {
-    await $.ui.open({ id: PANE, title: 'inloop', focus: true, closeOnEscape: true })
-    const placed = ((await $.ui.panes()) as any[]).find((x) => x.id === PANE)
-    if (placed && placed.isPlaced === false) {
-      await closePane($)
-      return l.pane_no_room
-    }
-    paneOpen = true
-    return l.pane_opened
-  } catch {
-    paneOpen = false
-    return l.pane_no_room
-  }
-}
-
 const detailName = (l: Labels, value: string) => l[('detail_' + value) as 'detail_brief'] ?? value
 const sourceName = (l: Labels, source: string) => l[('source_' + source) as 'source_user']
 
-// ---- the review page --------------------------------------------------------------------------
+// ---- the review -------------------------------------------------------------------------------
 
 // Every part of one session's log, in order
 async function readSession($: any, id: string): Promise<LogRecord[]> {
@@ -454,28 +396,117 @@ async function readSession($: any, id: string): Promise<LogRecord[]> {
   return out
 }
 
-async function mtime($: any, path: string): Promise<number> {
+// Every session's log in this project, sessions in the order they began; this session's records
+// come from memory while nothing of it is on disk.
+async function readAll($: any): Promise<LogRecord[]> {
+  await writing
+  let names: string[] = []
   try {
-    return (await $.fs.stat(path)).mtimeMs
+    names = (await $.fs.list(root + '/' + LOG_DIR)).filter((x: any) => x.kind === 'file').map((x: any) => x.name)
   } catch {
-    return 0
+    names = []
   }
+  const all: LogRecord[][] = []
+  for (const [id] of sessionsOf(names)) all.push(await readSession($, id))
+  if (!stored && records.length) all.push(records)
+  return all.sort((a, b) => (a[0]?.ts ?? 0) - (b[0]?.ts ?? 0)).flat()
 }
 
-// Writes the review page of one session from its log (this session's may still be in memory).
-// Pages are written again each time, so a newer inloop or another language redraws old ones too.
-// With skipEmpty, another session that recorded nothing gets no page: path is null.
-async function writePage($: any, id: string, back: boolean, skipEmpty = false) {
-  const code = shownIn(settings.language.code)
-  const l = labels(code)
-  const page = build(id === session && !stored ? records : await readSession($, id))
-  const empty = !page.counts.notes && !page.counts.edits && !page.counts.outside
-  if (skipEmpty && empty && id !== session) return { path: null, page, trimmed: 0 }
-  const path = root + '/' + REVIEW_DIR + '/' + id + '.html'
-  const { html, trimmed } = fit(page, l, { code, log: LOG_DIR + '/' + id + '.jsonl', back: back ? 'index.html' : undefined })
-  await keepOutOfGit($)
-  await $.fs.write(path, html)
-  return { path, page, trimmed }
+// A patch from git, file by file: secret values redacted, a secret file's content left out, and a
+// file whose whole-function context runs long fetched again with eight lines of context.
+async function gitFiles($: any, argv: string[]): Promise<FileData[]> {
+  const r = await gitRun($, ['git', '-c', 'core.quotePath=false', ...argv, '-W'])
+  if (!r.ok) return []
+  const out: FileData[] = []
+  for (const chunk of r.out.split(/\n(?=diff --git )/)) {
+    if (!chunk.startsWith('diff --git ')) continue
+    const raw = parsePatch(chunk)[0]
+    if (!raw) continue
+    if (sensitive(raw.path)) { out.push({ patch: { ...raw, hunks: [] }, redactions: 0, hidden: 'sensitive', cut: false }); continue }
+    if (raw.binary) { out.push({ patch: raw, redactions: 0, hidden: 'binary', cut: false }); continue }
+    let text = chunk
+    let cut = false
+    if (lineCount(raw) > FILE_LINES) {
+      const narrow = await gitRun($, ['git', '-c', 'core.quotePath=false', ...argv, '-U8', '--', raw.path])
+      if (narrow.ok && narrow.out.startsWith('diff --git ')) { text = narrow.out; cut = true }
+    }
+    const red = redact(text)
+    let patch = parsePatch(red.text)[0] ?? raw
+    if (lineCount(patch) > FILE_LINES * 2) { patch = clip(patch, FILE_LINES * 2); cut = true }
+    out.push({ patch, redactions: red.count, hidden: null, cut })
+  }
+  return out
+}
+
+// The commits git prints with this format, oldest first
+const LOG_FORMAT = '--format=%H%x00%P%x00%an%x00%at%x00%s%x00%b%x1e'
+
+async function commitsFrom($: any, out: string): Promise<GitCommit[]> {
+  const commits: GitCommit[] = []
+  for (const entry of out.split('\u001e')) {
+    const [sha, parents = '', author = '', at = '0', subject = '', body = ''] = entry.replace(/^\n/, '').split('\u0000')
+    if (!/^[0-9a-f]{7,64}$/.test(sha ?? '')) continue
+    const parentList = parents.split(' ').filter(Boolean)
+    const files = await gitFiles($, ['show', '--format=', '--no-color', '--no-ext-diff', ...(parentList.length > 1 ? ['--diff-merges=first-parent'] : []), sha])
+    commits.push({ sha, parents: parentList, author, time: Number(at) * 1000, subject, body: body.trim(), files })
+  }
+  return commits
+}
+
+// The commits of a range ("main..", "HEAD~5..", or "HEAD" for all of its history) or one commit
+// ("a1b2c3d"): the newest REVIEW_COMMITS, oldest first, and how many more the range holds. Null
+// when git does not know it.
+async function commitsOf($: any, what: string, single = !what.includes('..')): Promise<{ commits: GitCommit[]; more: number } | null> {
+  if (single) {
+    const one = await gitRun($, ['git', 'log', '--max-count=1', LOG_FORMAT, what, '--'])
+    return one.ok ? { commits: await commitsFrom($, one.out), more: 0 } : null
+  }
+  const total = await gitRun($, ['git', 'rev-list', '--count', what, '--'])
+  if (!total.ok) return null
+  const r = await gitRun($, ['git', 'log', '--reverse', '--max-count=' + REVIEW_COMMITS, LOG_FORMAT, what, '--'])
+  return { commits: await commitsFrom($, r.out), more: Math.max(0, Number(total.out.trim()) - REVIEW_COMMITS) }
+}
+
+// The commits inloop recorded in any session that git still has, oldest first
+async function recordedCommits($: any, all: LogRecord[]): Promise<{ commits: GitCommit[]; more: number }> {
+  const shas = [...new Set(all.flatMap((r) => (r.kind === 'commit' ? [r.sha] : [])))]
+  if (!shas.length) return { commits: [], more: 0 }
+  const r = await gitRun($, ['git', 'log', '--no-walk=sorted', '--ignore-missing', LOG_FORMAT, ...shas.slice(-REVIEW_COMMITS)])
+  const commits = await commitsFrom($, r.out)
+  return { commits: commits.reverse(), more: Math.max(0, shas.length - REVIEW_COMMITS) }
+}
+
+// What is not committed: changes to tracked files against HEAD, and new files git does not track
+async function pendingFiles($: any): Promise<FileData[]> {
+  const hasHead = (await gitRun($, ['git', 'rev-parse', '--verify', '--quiet', 'HEAD'])).ok
+  const out = await gitFiles($, ['diff', '--no-color', '--no-ext-diff', ...(hasHead ? ['HEAD'] : ['--cached'])])
+  const fresh = nul((await gitRun($, ['git', 'ls-files', '--others', '--exclude-standard', '-z'])).out).filter((p) => !inloopOwn(p))
+  for (const path of fresh.slice(0, UNTRACKED_MAX)) {
+    const empty = added(path, '')
+    if (sensitive(path)) { out.push({ patch: empty, redactions: 0, hidden: 'sensitive', cut: false }); continue }
+    const snap = await snapshot($, root + '/' + path)
+    if (snap.skipped === 'binary') { out.push({ patch: empty, redactions: 0, hidden: 'binary', cut: false }); continue }
+    if (snap.skipped) { out.push({ patch: empty, redactions: 0, hidden: null, cut: true }); continue }
+    const red = redact(snap.text)
+    let patch = added(path, red.text)
+    const long = lineCount(patch) > FILE_LINES * 2
+    if (long) patch = clip(patch, FILE_LINES * 2)
+    out.push({ patch, redactions: red.count, hidden: null, cut: long })
+  }
+  return out
+}
+
+// The files that explanations of existing code point to, as they stand now
+async function explainedFiles($: any, all: LogRecord[]): Promise<{ path: string; text: string }[]> {
+  const paths = new Set<string>()
+  for (const r of all) if (r.kind === 'note' && r.source === 'reconstructed' && !r.note.commit) for (const f of r.note.files) paths.add(relative(f, root))
+  const out: { path: string; text: string }[] = []
+  for (const path of [...paths].slice(0, 12)) {
+    if (sensitive(path) || inloopOwn(path)) continue
+    const snap = await snapshot($, root + '/' + path)
+    if (snap.exists && !snap.skipped) out.push({ path, text: redact(snap.text).text })
+  }
+  return out
 }
 
 // Opens a page in the browser, where a person can see one. False when it could not.
@@ -497,37 +528,44 @@ async function show($: any, path: string): Promise<boolean> {
   }
 }
 
-async function openReview($: any, all: boolean, l: Labels): Promise<string> {
+// Writes the review and opens it: this session's work by default, every commit inloop recorded
+// with "all", or a git range or commit.
+async function review($: any, what: string, theme: Theme, l: Labels): Promise<string> {
   await writing
   try {
+    await checkHead($)
     await checkOutside($)
   } catch {
-    // the page shows the last check
+    // the review shows what git shows
   }
-  if (!all) {
-    const { path, trimmed } = await writePage($, session, false)
-    return say((await show($, path!)) ? l.open_opened : l.open_written, { path: path! }) + (trimmed ? '\n' + l.open_trimmed : '')
-  }
-  let names: string[] = []
-  try {
-    names = (await $.fs.list(root + '/' + LOG_DIR)).filter((x: any) => x.kind === 'file').map((x: any) => x.name)
-  } catch {
-    names = []
-  }
-  const found: { id: string; changed: number }[] = []
-  for (const [id, parts] of sessionsOf(names)) found.push({ id, changed: await mtime($, root + '/' + LOG_DIR + '/' + parts[parts.length - 1]) })
-  found.sort((a, b) => b.changed - a.changed)
-  const rows: SessionRow[] = []
-  for (const { id } of found.slice(0, SESSIONS_MAX)) {
-    const { path, page } = await writePage($, id, true, true)
-    if (!path) continue
-    rows.push({ href: id + '.html', started: page.started, title: titleOf(page), notes: page.counts.notes, edits: page.counts.edits, unexplained: page.counts.unexplained })
+  const all = await readAll($)
+  const scope: 'session' | 'range' | 'all' = what === 'all' ? 'all' : what ? 'range' : 'session'
+  if (scope === 'range' && !/^[\w./~^@{}:+-]+$/.test(what)) return say(l.review_bad_range, { range: what })
+  if (scope === 'range' && what.startsWith('-')) return say(l.review_bad_range, { range: what })
+  let found: { commits: GitCommit[]; more: number } = { commits: [], more: 0 }
+  let pending: FileData[] | null = null
+  if (git) {
+    if (scope === 'all') found = await recordedCommits($, all)
+    else {
+      // this session's commits start where HEAD stood when it began; in a repository that had none
+      // yet, every commit is the session's
+      const got = scope === 'range' ? await commitsOf($, what) : await commitsOf($, firstHead ? firstHead + '..HEAD' : 'HEAD', false)
+      if (!got && scope === 'range') return say(l.review_bad_range, { range: what })
+      if (got) found = got
+    }
+    if (scope !== 'range') pending = await pendingFiles($)
   }
   const code = shownIn(settings.language.code)
-  const project = root.split('/').pop() || root
-  const path = root + '/' + REVIEW_DIR + '/index.html'
-  await $.fs.write(path, sessionList(project, rows, Math.max(0, found.length - SESSIONS_MAX), labels(code), code, VERSION))
-  return say((await show($, path)) ? l.open_all_opened : l.open_all_written, { path })
+  const model = buildReview({
+    records: all, commits: found.commits, more: found.more, pending, explained: await explainedFiles($, all), git, scope,
+    range: scope === 'range' ? what : null, project: root.split('/').pop() || root,
+  })
+  const { html, cut } = fitReview(model, labels(code), { code, theme, version: VERSION })
+  const name = scope === 'session' ? 'review' : scope === 'all' ? 'review-all' : 'review-' + what.replace(/[^\w.-]+/g, '_').slice(0, 60)
+  const path = root + '/' + REVIEW_DIR + '/' + name + (theme === 'auto' ? '' : '-' + theme) + '.html'
+  await keepOutOfGit($)
+  await $.fs.write(path, html)
+  return say((await show($, path)) ? l.review_opened : l.review_written, { path }) + (cut ? '\n' + l.review_trimmed : '')
 }
 
 function statusText(): string {
@@ -556,8 +594,8 @@ export function register(on: any, pluginOptions: any) {
       await $.tool.register(RECAP_SPEC)
       await $.command.register({
         name: PLUGIN,
-        description: 'inloop: the review page, the pane, the language and detail of notes, on and off',
-        argumentHint: '[open | open all | pane | status | lang <language> | detail <level> | adhd on|off | on | off | help]',
+        description: 'inloop: the review of Claude\'s work, the language and form of notes, on and off',
+        argumentHint: '[review [range | all] [--theme light|dark] | status | lang <language> | detail <level> | adhd on|off | on | off | help]',
         immediate: true,
       })
     } catch (err) {
@@ -637,32 +675,6 @@ export function register(on: any, pluginOptions: any) {
     return noteCard(t, redactDeep(cleanNote(input).note).value, numbers.get(e.props.tool_use_id) ?? null, input.source === 'reconstructed', l)
   }).catch(($: any, e: any, next: any) => next(e))
 
-  // The pane: one step at a time, following the newest until the person steps back.
-  on('ui.render', { component: 'Pane' }, ($: any, e: any, next: any) => {
-    if (e.requestId !== PANE) return next(e)
-    const t = $.ui.resolve(e)
-    const code = shownIn(settings.language.code)
-    const l = labels(code)
-    const list = paneSteps()
-    const go = (to: number | null) => {
-      paneIndex = to === null || to >= list.length - 1 ? null : Math.max(0, to)
-      void redraw($)
-    }
-    return paneView(t, list, paneIndex, l, code, {
-      prev: () => go(shown(list.length, paneIndex) - 1),
-      next: () => go(shown(list.length, paneIndex) + 1),
-      latest: () => go(null),
-      page: () => void pageFromPane($, l),
-      close: () => void closePane($),
-    })
-  }).catch(($: any, e: any, next: any) => next(e))
-
-  // The person closed the pane (Escape or its tab): stop drawing it.
-  on('ui.close', ($: any, e: any, next: any) => {
-    if (e.id === PANE) paneOpen = false
-    return next(e)
-  })
-
   // Every edit is captured around the tool call. Whatever happens, the call goes on: every path
   // below ends in next(e), and a capture that fails is skipped.
   on('tool.call', { tool: ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'] }, async ($: any, e: any, next: any) => {
@@ -723,12 +735,15 @@ export function register(on: any, pluginOptions: any) {
     const [command = 'status', ...rest] = words.filter((w) => w !== '--project')
     const value = rest.join(' ')
     if (command === 'help') return { text: l.help }
-    if (command === 'pane') return { text: await openPane($, l) }
-    if (command === 'open') {
+    if (command === 'review') {
+      const at = rest.indexOf('--theme')
+      const wanted = at >= 0 ? rest[at + 1] : ''
+      const theme: Theme = wanted === 'light' || wanted === 'dark' ? wanted : 'auto'
+      const target = rest.filter((_, i) => at < 0 || (i !== at && i !== at + 1))[0] ?? ''
       try {
-        return { text: await openReview($, value === 'all', l) }
+        return { text: await review($, target, theme, l) }
       } catch (err) {
-        return { text: say(l.open_failed, { error: String(err) }) }
+        return { text: say(l.review_failed, { error: String(err) }) }
       }
     }
     if (command === 'status') return { text: statusText() }

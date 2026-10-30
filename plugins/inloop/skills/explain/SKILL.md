@@ -13,7 +13,7 @@ If nothing is named, ask what to explain: a file, a folder, a function or class,
 or the edits the review page lists without a note.
 
 Write what you find as inloop notes with the `mcp__inloop__note` tool, each with
-`"source": "reconstructed"`, so they appear on the review page (`/inloop open`) and in the
+`"source": "reconstructed"`, so they appear on the review page (`/inloop review`) and in the
 transcript as cards. Do not change any file while explaining.
 
 ## Language
@@ -32,7 +32,8 @@ Keep code, names and paths as they are in the code.
   what you left out, so the user can ask for it.
 - **A function or class:** one note, with every parameter worth explaining and what calls it.
 - **A commit range** (for example `HEAD~5..HEAD`, or a branch name): read `git log` and `git show`
-  for the range and write one note per logical change, in the order the changes were made.
+  for the range and write one note per commit, oldest first, with `commit` set to that commit's
+  hash, so the review shows the note beside that commit's code (`/inloop review HEAD~5..`).
 - **Edits without a note:** read them from the newest log in `.inloop/log/`, and write one note
   per edit from its diff and the code around it.
 
@@ -42,6 +43,7 @@ mention it. A note that guesses where it could have looked is worse than no note
 ## How to fill each note
 
 - `title`: what the code is, in a few words.
+- `tldr`: the one thing to remember about it, in one short sentence.
 - `files`: the files the note covers, relative to the project.
 - `what`: what the code does, for a reader who did not write it.
 - `why`: why it is built this way. For code you did not write, the reason is usually an
@@ -51,8 +53,12 @@ mention it. A note that guesses where it could have looked is worse than no note
   ..."). Everything else is `judgment`.
 - `symbols`: each class, function, method, endpoint or type the note covers, with `why_exists`,
   `why_this_shape`, and `called_by` from a search of the code, never from a guess.
+- `uses`: what the code brings in from other files or libraries: `name`, `from` (the file or the
+  package) and `why` it is used here; for a library, why this one.
 - `parameters`: arguments and settings whose meaning or value is not obvious. Give `doc_url` only
   for an official documentation page you know.
+- `lines`: comments on the lines a reader would stop at, each with `anchor` (text copied exactly
+  from that line) and `says`. The review shows them numbered beside the code.
 - `risks`: what looks fragile or surprising, or is worth checking by hand.
 - `source`: always `"reconstructed"`.
 
@@ -61,5 +67,5 @@ Never put secrets, tokens or passwords in a note, even when the code holds them.
 ## Finish
 
 Call `mcp__inloop__recap` once: an overview, the order to read the files in and why, the files
-grouped by role, and what the user should check by hand. Then tell the user that `/inloop open`
-shows the notes.
+grouped by role, and what the user should check by hand. Then tell the user that `/inloop review`
+shows the notes beside the code (`/inloop review <range>` for the commits you explained).

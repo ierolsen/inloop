@@ -42,11 +42,11 @@ test('edits pair with the note before them; after a new prompt, an edit with no 
   // a subagent's note pairs with that subagent's edits only
   await $.tool.call(note({ tool_use_id: 'n2', agentId: 'sub-1', title: 'Tidy util', files: ['util.py'], what: 'w', why: 'y' }))
   await $.tool.call({ tool: 'Edit', tool_use_id: 'e2', agentId: 'sub-1', file_path: ROOT + '/util.py', old_string: 'x = 2', new_string: 'x = 3' } as any)
-  expect((await $.turn.complete(turnDone('t1'))).text).toBe('inloop: 2 notes, 3 edits. /inloop open shows them.')
+  expect((await $.turn.complete(turnDone('t1'))).text).toBe('inloop: 2 notes, 3 edits. /inloop review shows them.')
 
   await $.turn.start({ text: 'say hello instead', turnId: 't2' })
   await $.tool.call({ tool: 'Edit', tool_use_id: 'e3', file_path: ROOT + '/greet.py', old_string: 'hi', new_string: 'hello' } as any)
-  expect((await $.turn.complete(turnDone('t2'))).text).toBe('inloop: 0 notes, 1 edit, 1 without a note. /inloop open shows them.')
+  expect((await $.turn.complete(turnDone('t2'))).text).toBe('inloop: 0 notes, 1 edit, 1 without a note. /inloop review shows them.')
 
   expect(edits(w).map((r) => [r.id, r.note, r.listed, r.agent, r.turn])).toEqual([
     ['w1', 'n1', true, null, 't1'],
@@ -174,7 +174,7 @@ test('files changed outside the edit tools are listed when the turn ends, once',
     ['git diff --name-only --diff-filter=D -z ' + HEAD]: '',
     ['git diff --no-color --no-ext-diff ' + HEAD + ' -- run.sh']: 'diff --git a/run.sh b/run.sh\nindex 1..2 100644\n--- a/run.sh\n+++ b/run.sh\n@@ -1 +1 @@\n-echo old\n+echo new\n',
   })
-  expect((await $.turn.complete(turnDone('t1'))).text).toBe('inloop: 1 note, 1 edit, 2 files changed outside the edit tools. /inloop open shows them.')
+  expect((await $.turn.complete(turnDone('t1'))).text).toBe('inloop: 1 note, 1 edit, 2 files changed outside the edit tools. /inloop review shows them.')
   const outside = w.records().filter((r) => r.kind === 'outside')
   expect(outside).toHaveLength(1)
   expect(outside[0].more).toBe(0)
@@ -253,71 +253,12 @@ test('files outside the project and inloop\'s own files are not recorded as edit
   expect((await $.turn.complete(turnDone('t1'))).text).toBe('Done.')
 })
 
-test('/inloop open writes the review page and says where it is', async ($, on) => {
-  const w = worldOf(on, { store: { settings: { language: 'tr' } } })
-  await $.session.start(START)
-  await $.turn.start({ text: 'greet', turnId: 't1' })
-  await $.tool.call(note({ title: 'Selamlama fonksiyonu', files: ['greet.py'], what: 'Ekler.', why: 'CLI istiyor.' }))
-  await $.tool.call({ tool: 'Write', file_path: ROOT + '/greet.py', content: 'def greet():\n    pass\n' } as any)
-  const page = ROOT + '/.inloop/review/' + SESSION_ID + '.html'
-  // no browser could be opened here, so the path is the answer
-  expect((await $.command.run(command('open'))).text).toBe('İnceleme sayfası hazır: ' + page)
-  const html = w.files.get(page) ?? ''
-  expect(html).toContain('<html lang="tr">')
-  expect(html).toContain('Selamlama fonksiyonu')
-  expect(html).toContain('<td class="m">+</td><td class="c">def greet():</td>')
-  expect(html).toContain('.inloop/log/' + SESSION_ID + '.jsonl')
-  expect(html).not.toContain(ROOT + '/.inloop/log') // the footer names the log without the absolute path
-})
-
-test('/inloop open shows the page in the browser where it can', async ($, on) => {
-  const page = ROOT + '/.inloop/review/' + SESSION_ID + '.html'
-  const w = worldOf(on, { git: { 'uname -s': 'Darwin\n', ['open ' + page]: '' } })
-  await $.session.start(START)
-  expect((await $.command.run(command('open'))).text).toBe('Opened the review page: ' + page)
-  expect(w.ran).toContain('open ' + page)
-})
-
-test('a session with no person at the screen never starts a browser', async ($, on) => {
-  const w = worldOf(on, { git: { 'uname -s': 'Darwin\n' } })
-  await $.session.start({ ...START, isInteractive: false })
-  expect((await $.command.run(command('open'))).text).toStartWith('The review page is at ')
-  expect(w.ran.filter((c) => !c.startsWith('git '))).toEqual([])
-})
-
-test('/inloop open all writes a page for each session and a list of them', async ($, on) => {
-  const old = [
-    { v: 1, kind: 'session', ts: 1, session: 'old-1', agent: null, turn: null, root: ROOT, language: 'English', language_code: 'en', detail: 'standard', version: '0.1.0' },
-    { v: 1, kind: 'note', ts: 2, session: 'old-1', agent: null, turn: 't1', id: 'n1', n: 1, source: 'live', problems: [], note: { title: 'Set up the project', files: ['a.py'], what: 'w', why: 'y', basis: null, alternatives: [], parameters: [], symbols: [], risks: [] } },
-  ]
-  const quiet = [{ ...old[0], session: 'quiet-1' }, { v: 1, kind: 'baseline', ts: 1, session: 'quiet-1', agent: null, turn: null, git: false, head: null, dirty: [] }]
-  const lines = (records: any[]) => records.map((r) => JSON.stringify(r) + '\n').join('')
-  const w = worldOf(on, { files: { [ROOT + '/.inloop/log/old-1.jsonl']: lines(old), [ROOT + '/.inloop/log/quiet-1.jsonl']: lines(quiet) } })
-  await $.session.start(START)
-  const list = ROOT + '/.inloop/review/index.html'
-  expect((await $.command.run(command('open all'))).text).toBe('The list of sessions is at ' + list)
-  const html = w.files.get(list) ?? ''
-  expect(html).toContain('<a href="old-1.html">Set up the project</a>')
-  // sessions that recorded nothing are left off: an old quiet one, and this one so far
-  expect(html).not.toContain('quiet-1.html')
-  expect(html).not.toContain(SESSION_ID + '.html')
-  expect(w.files.get(ROOT + '/.inloop/review/old-1.html')).toContain('href="index.html"')
-})
-
 test('a project setting writes .inloop/ with its .gitignore', async ($, on) => {
   const w = worldOf(on)
   await $.session.start(START)
   await $.command.run(command('detail deep --project'))
   expect(JSON.parse(w.files.get(ROOT + '/.inloop/config.json') ?? '{}')).toEqual({ detail: 'deep' })
   expect(w.files.get(ROOT + '/.inloop/.gitignore')).toBe('*\n')
-  expect(w.files.has(LOG)).toBe(false)
-})
-
-test('/inloop open shows this session before anything reached the disk', async ($, on) => {
-  const w = worldOf(on)
-  await $.session.start(START)
-  await $.command.run(command('open'))
-  expect(w.files.get(ROOT + '/.inloop/review/' + SESSION_ID + '.html')).toContain('Nothing recorded yet.')
   expect(w.files.has(LOG)).toBe(false)
 })
 
@@ -388,4 +329,43 @@ test('a commit with none of Claude\'s work, made in a session that recorded noth
   await $.turn.start({ text: 'hi', turnId: 't1' })
   await $.turn.complete(turnDone('t1'))
   expect([...w.files.keys()]).toEqual([])
+})
+
+test('/inloop review writes the session\'s commits and what is not committed yet, explained beside the code', async ($, on) => {
+  const A = 'a1a1a1a1a1'
+  const B = 'b2b2b2b2b2'
+  const SHAPES = 'class Rectangle:\n    def area(self):\n        return self.w * self.h\n'
+  const git: Git = { 'git rev-parse --show-toplevel': ROOT + '\n', 'git rev-parse --verify --quiet HEAD': A + '\n', 'git status --porcelain=v1 -z --untracked-files=all': '' }
+  const w = worldOf(on, { git })
+  await $.session.start(START)
+  await $.turn.start({ text: 'build', turnId: 't1' })
+  await $.tool.call({ ...note({ title: 'Shapes', files: ['shapes.py'], symbols: [{ name: 'Rectangle', kind: 'class', why_exists: 'holds sizes' }], lines: [{ anchor: 'return self.w * self.h', says: 'area is width times height' }] }), tool_use_id: 'n1' })
+  await $.tool.call({ tool: 'Write', tool_use_id: 'w1', file_path: ROOT + '/shapes.py', content: SHAPES } as any)
+  w.shell = () => Object.assign(git, {
+    'git rev-parse --verify --quiet HEAD': B + '\n',
+    ['git rev-list --reverse --max-count=50 ' + A + '..' + B]: B + '\n',
+    ['git show -s --format=%P%x00%s ' + B]: A + '\u0000feat: add shapes\n',
+    ['git diff-tree --no-commit-id --name-only -r -z --root ' + B]: 'shapes.py\u0000',
+  })
+  await $.tool.call({ tool: 'Bash', command: 'git commit -am shapes' } as any)
+  await $.tool.call({ ...note({ title: 'Use it', files: ['app.py'], uses: [{ name: 'largest', from: 'shapes.py', why: 'picks the biggest' }] }), tool_use_id: 'n2' })
+  await $.tool.call({ tool: 'Write', tool_use_id: 'w2', file_path: ROOT + '/app.py', content: 'from shapes import Rectangle, largest\n' } as any)
+  // what git says when the review asks
+  Object.assign(git, {
+    ['git rev-list --count ' + A + '..HEAD --']: '1\n',
+    ['git log --reverse --max-count=30 --format=%H%x00%P%x00%an%x00%at%x00%s%x00%b%x1e ' + A + '..HEAD --']: B + '\u0000' + A + '\u0000Erol\u00001700000000\u0000feat: add shapes\u0000\u001e\n',
+    ['git -c core.quotePath=false show --format= --no-color --no-ext-diff ' + B + ' -W']: 'diff --git a/shapes.py b/shapes.py\nnew file mode 100644\n--- /dev/null\n+++ b/shapes.py\n@@ -0,0 +1,3 @@\n' + SHAPES.trimEnd().split('\n').map((l) => '+' + l).join('\n') + '\n',
+    'git -c core.quotePath=false diff --no-color --no-ext-diff HEAD -W': '',
+    'git ls-files --others --exclude-standard -z': 'app.py\u0000',
+  })
+  const page = ROOT + '/.inloop/review/review.html'
+  expect((await $.command.run(command('review'))).text).toBe('The review is at ' + page)
+  const html = w.files.get(page) ?? ''
+  for (const word of ['Commit 1 of 1', 'feat: add shapes', 'Not committed yet', 'area is width times height', 'from shapes.py', 'picks the biggest']) expect(html, word).toContain(word)
+  // the class named in the uncommitted file links to where the commit defines it
+  expect(html).toContain('<a class="xref" href="#c-' + B + '-f0-1" title="holds sizes">Rectangle</a>')
+  await $.command.run(command('review --theme dark'))
+  expect(w.files.get(ROOT + '/.inloop/review/review-dark.html')).toContain('data-theme="dark" data-fixed')
+  expect((await $.command.run(command('review nosuch..'))).text).toBe('git does not know "nosuch..". Try a range such as main.. or HEAD~5.., or a commit hash.')
+  expect((await $.command.run(command('review --output=x'))).text).toStartWith('git does not know')
 })

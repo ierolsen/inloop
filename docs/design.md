@@ -38,8 +38,8 @@ logged without a diff.
 
 ### Changes outside the edit tools
 
-At session start inloop records `HEAD` and the files already changed. On `/inloop open` and at the
-end of each turn, every file that changed since then without a logged edit is listed with its
+At session start inloop records `HEAD` and the files already changed. On `/inloop review` and at
+the end of each turn, every file that changed since then without a logged edit is listed with its
 diff. Most of these come from shell commands. Outside a git repository the page says the check
 is off.
 
@@ -67,46 +67,65 @@ The language is taken from the first of these that is set:
 Names and codes are both accepted. Page labels exist for `en`, `tr`, `de` and `nl`. Other languages
 get English labels, while Claude still writes the notes in them.
 
-### The review page
+### Commits
 
-`/inloop open` writes `.inloop/review/<session>.html` from the session's log. In an interactive
-session it opens the page in the browser (`open` on macOS, `xdg-open` elsewhere, `cmd /c start`
-on Windows); otherwise, and whenever that fails, it prints the path. `/inloop open all` writes a
-page for each of the 20 most recent sessions and `index.html`, which lists them.
+Claude commits through the shell, so after every Bash or PowerShell call (and at the end of each
+turn, for commits made by hand) inloop reads `HEAD`. When it has moved, each new commit gets a
+`commit` record: its hash, parents, subject, files, and the edits and notes that went into it. An
+edit goes with the first commit that contains its file; a note without edits, such as the one
+Claude writes before a shell command, with the first commit that contains a file it names. The
+command itself is never touched: the hook calls `next(e)` first, and its `.catch` replays the
+result instead of running the command again. A commit that holds none of Claude's work never
+creates a log.
 
-- A session splits into tasks at each recap on the main loop. A subagent's recap shows inside the
-  task it belongs to. The work after the last recap is read in a fixed order: data and types,
-  logic, interface, tests, configuration, documentation, other; within a role, in the order the
-  files first changed.
-- Edits stay with the note they were paired with when they were made. A file changed outside the
-  edit tools goes under the latest note that names it, which is usually the note Claude writes
-  before a shell command; otherwise it is listed in a section of its own.
-- The page is one file: inline CSS and a few lines of script that fold the diffs. It reads the
-  same without the script. Everything taken from the log is escaped, and a Content-Security-Policy
-  meta tag stops the page from loading anything.
-- `$.fs.write` takes 4 MiB, so a page over 3.8 MB leaves out its largest diffs first, then its
-  oldest tasks, and says so on the page.
-- Pages are drawn again on every `/inloop open`, so a newer inloop or another language redraws
-  the old ones too.
-- Narrow screens stack the tables into labelled rows; nothing but a diff scrolls sideways at 390 px.
+### The review
+
+`/inloop review` writes `.inloop/review/review.html` and opens it in an interactive session
+(`open` on macOS, `xdg-open` elsewhere, `cmd /c start` on Windows); otherwise, and whenever that
+fails, it prints the path.
+
+- **What it covers.** By default the session's work: its commits (from where `HEAD` stood when it
+  began) and then what is not committed yet. `/inloop review <range>` takes any git range or commit
+  (`main..`, `HEAD~5..`, `a1b2c3d`); `/inloop review all` every commit inloop recorded. The newest
+  30 commits are shown and older ones counted.
+- **Code comes from git.** Each commit's files come from `git show -W`, which shows whole functions
+  around a change; a file past 400 lines is fetched again with eight lines of context, and past 800
+  it is cut. What is not committed comes from `git diff -W HEAD` and from reading new files. Every
+  patch goes through redaction, and files that usually hold secrets show their name only. Outside
+  git the page falls back to the diffs inloop captured itself.
+- **Notes find their commit** by the commit records; a commit that was amended or rebased since is
+  found again by its subject; a reconstructed note names its commit itself.
+- **Explanations sit beside the code.** Each note's class and function cards go to the line that
+  defines them, `uses` to the first line naming what is brought in (the import, else the call),
+  parameters to the first line using them, and `lines` comments to the line whose text they quote
+  (compared without whitespace). Every mark is placed once per commit and numbered; what finds no
+  line is listed under its note. A name the review defines links to its definition from other
+  lines.
+- **The page** is one file with no network: inline CSS, a small built-in highlighter, a theme switch
+  (auto, light, dark) and a print button for PDF. `--theme light|dark` writes it with a fixed
+  theme, to share. A page over 3.8 MB leaves out the code of its longest files first, then its
+  oldest commits.
+- Narrow screens stack the explanations above their code; only code scrolls sideways at 390 px.
 
 ### The live view
 
 - The note tool's row and the recap tool's row in the transcript are drawn as cards
   (`ui.render` on `ToolUse`), from the call's input alone, cleaned and redacted as the log is.
-  While Claude still streams the call, a card shows the fields that have arrived. A call that
-  failed keeps the engine's own row.
-- `/inloop pane` opens a pane with one note at a time and the diffs it explains. It follows the
-  newest note while Claude works; p and n step back and forth, l follows again, o writes and
-  opens the review page.
-- Diffs in the pane are drawn by the surface's own `Code` element (`format: 'diff'`). Its reader
-  refuses a hunk whose header counts lines that are not there, which is what a diff cut at its
-  line limit looks like, so every header is counted again from its lines and a leaf stays under
-  10,000 characters.
-- The pane is redrawn only while it is open, and its steps are worked out again only when a
-  record was added.
-- `claude plugin test` mounts the cards and the pane on all four surfaces (terminal, desktop,
-  VS Code, mobile), since `-p` draws nothing.
+  The card leads with the note's `tldr`. While Claude still streams the call, a card shows the
+  fields that have arrived. A call that failed keeps the engine's own row.
+- The code itself is in Claude Code's own rows for each edit, right under the card. An earlier
+  pane that stepped through notes and diffs was dropped: with the cards and the review it was a
+  third place to look.
+- `claude plugin test` mounts the cards on all four surfaces (terminal, desktop, VS Code,
+  mobile), since `-p` draws nothing.
+
+### ADHD-friendly notes
+
+`/inloop adhd on` (or the plugin's `adhd` setting, or `--project`) adds a writing block to the
+instructions: the point first in `tldr`, one idea per sentence, short "- " lines, bold for the
+words a skimming reader must not miss, the same order every time, every term, symbol, formula and
+parameter explained the first time with an example from the code, no em-dashes. It sets the form;
+the detail level still sets how much is explained.
 
 ### Explaining code that already exists
 
@@ -143,7 +162,7 @@ A throwaway mod and `claude -p --plugin-dir` runs in a scratch git repository sh
 marked `reconstructed`, each reason worded as an inference with the missing evidence named, callers
 with line numbers, and a recap; no file changed.
 
-`claude -p "/inloop open all"` runs the command: the reply comes in the project's language, and as
+`claude -p` runs inloop's commands (checked with `/inloop open all`, since replaced by `/inloop review`): the reply comes in the project's language, and as
 the session is not interactive no browser is started.
 
 Not covered by `-p`, so tested with `claude plugin test` and by hand: the live card, the pane, the

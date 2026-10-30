@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import { language, resolve, detail, languageName, fold } from '../hooks/config.ts'
 import { instructions } from '../hooks/instructions.ts'
 import { cleanNote, cleanRecap, relative, inside, sameFile, Pairing } from '../hooks/note.ts'
-import { diff, lines, isBinary, fitDiff } from '../hooks/diff.ts'
+import { diff, lines, isBinary } from '../hooks/diff.ts'
 import { redact, redactDeep, sensitive, REDACTED } from '../hooks/redact.ts'
 import { parse, line, sessionsOf, partPath } from '../hooks/log.ts'
 import { porcelain, nul, unaccounted, hunks, counts, state } from '../hooks/outside.ts'
@@ -169,16 +169,4 @@ test('labels fall back to English and fill their placeholders', async () => {
   expect([0, 1, 2].map((n) => count('en', en.notes, n))).toEqual(['0 notes', '1 note', '2 notes'])
   // a language without labels of its own counts in English, whatever its own rules say
   expect(count('fr', en.notes, 0)).toBe('0 notes')
-})
-
-test('a diff for the pane has every hunk header counted again and stops within its size', async () => {
-  // a stored diff cut at its line limit: the header still says 10 lines
-  const cut = '@@ -1,10 +1,10 @@\n a\n-b\n+c\n d'
-  expect(fitDiff(cut, 1000)).toEqual({ text: '@@ -1,3 +1,3 @@\n a\n-b\n+c\n d', cut: false })
-  expect(fitDiff('@@ -0,0 +1,2 @@\n+x\n+y\n\\ No newline at end of file', 1000).text).toBe('@@ -0,0 +1,2 @@\n+x\n+y')
-  const long = '@@ -1,3 +1,3 @@\n-' + 'a'.repeat(50) + '\n+' + 'b'.repeat(50) + '\n c\n@@ -20 +20 @@\n-x\n+y'
-  const fitted = fitDiff(long, 100)
-  expect(fitted.cut).toBe(true)
-  expect(fitted.text).toBe('@@ -1,1 +1,0 @@\n-' + 'a'.repeat(50))
-  expect(fitDiff('', 100)).toEqual({ text: '', cut: false })
 })

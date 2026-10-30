@@ -7,9 +7,10 @@ Rules for working on inloop in this repository.
 A Claude Code plugin that keeps people in the loop with the code their agent writes. Before each
 change, Claude calls inloop's `note` tool with a short, structured explanation: what the change
 does, why, the parameters that matter, and why each new class or function exists. When a task is
-done it calls `recap`. inloop captures every file edit with its diff, shows the notes live, and
-renders a review page (`/inloop open`). Notes are written in the language the user picks,
-independent of the language they chat in.
+done it calls `recap`. inloop captures every file edit with its diff and every commit, shows the
+notes live, and renders a review, commit by commit, with every explanation beside its line
+(`/inloop review`). Notes are written in the language the user picks, independent of the
+language they chat in, and in an ADHD-friendly form when asked (`/inloop adhd on`).
 
 The plan is in `docs/plan.md`; design decisions and the checks behind them are in `docs/design.md`.
 

@@ -117,37 +117,3 @@ export function diff(before: string, after: string, maxLines = 400): Diff {
   }
   return { text: out.join('\n'), added, removed, truncated }
 }
-
-// A diff a strict hunk reader takes, within max characters. Every hunk header is counted again
-// from the lines under it, because a stored diff can end in a hunk cut short whose header still
-// counts the lines that were cut; the text stops at a line boundary.
-export function fitDiff(text: string, max: number): { text: string; cut: boolean } {
-  const out: string[] = []
-  let size = 0
-  let cut = false
-  let hunk: { o: number; n: number; lines: string[] } | null = null
-  const flush = () => {
-    if (!hunk || !hunk.lines.length) return
-    const old = hunk.lines.filter((x) => x[0] !== '+').length
-    const now = hunk.lines.filter((x) => x[0] !== '-').length
-    out.push('@@ -' + hunk.o + ',' + old + ' +' + hunk.n + ',' + now + ' @@', ...hunk.lines)
-  }
-  for (const raw of text.split('\n')) {
-    const h = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw)
-    if (h) {
-      flush()
-      hunk = { o: Number(h[1]), n: Number(h[2]), lines: [] }
-      size += 40
-      continue
-    }
-    if (!hunk || !/^[ +-]/.test(raw)) continue // "\ No newline at end of file" and stray lines
-    if (size + raw.length + 1 > max) {
-      cut = true
-      break
-    }
-    hunk.lines.push(raw)
-    size += raw.length + 1
-  }
-  flush()
-  return { text: out.join('\n'), cut }
-}
