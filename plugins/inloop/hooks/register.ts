@@ -812,7 +812,7 @@ async function commitsByOid($: any, oids: string[]): Promise<{ commits: GitCommi
 const shareFile = (name: string) => root + '/' + SHARE_DIR + '/' + name
 
 // /inloop share [mail | copy | file] [range | all]: the page with a fixed theme and its Markdown in
-// .inloop/share, then the page in a new e-mail, on the clipboard or in the file manager.
+// .inloop/share, then the page in a new e-mail or selected in the file manager.
 // The words it takes for where a review goes; a pull request has its own command.
 type ShareTo = 'mail' | 'copy' | 'file'
 const SHARE_TO: Record<string, ShareTo> = { mail: 'mail', email: 'mail', 'e-mail': 'mail', copy: 'copy', clipboard: 'copy', slack: 'copy', teams: 'copy', file: 'file' }
@@ -841,18 +841,26 @@ async function chooseShare($: any, what: string, theme: Theme, origin: string, l
 const BROWSERS = new Set(['com.apple.safari', 'com.google.chrome', 'com.google.chrome.canary', 'org.mozilla.firefox', 'com.microsoft.edgemac',
   'company.thebrowser.browser', 'com.brave.browser', 'com.operasoftware.opera', 'com.vivaldi.vivaldi', 'org.chromium.chromium', 'app.zen-browser.zen'])
 
-// The app that opens mailto: links on this Mac, as macOS's Launch Services resolves it (AppleScript
-// with AppKit, every argument fixed); Apple Mail when it names none
+// The app a person chose for mailto: links, in macOS's Launch Services settings as `defaults export`
+// prints them (XML). Each handler is a <dict>; the one inside it, its preferred versions, goes first.
+function mailtoHandler(xml: string): string | null {
+  const flat = xml.replace(/<key>LSHandlerPreferredVersions<\/key>\s*<dict>[\s\S]*?<\/dict>/g, '')
+  for (const block of flat.split('<dict>')) {
+    if (!/<key>LSHandlerURLScheme<\/key>\s*<string>mailto<\/string>/i.test(block)) continue
+    const app = /<key>LSHandlerRoleAll<\/key>\s*<string>([\w.-]+)<\/string>/.exec(block)?.[1]
+    if (app) return app
+  }
+  return null
+}
+
+// The app that opens mailto: links on this Mac; Apple Mail when the person chose none
 async function mailApp($: any): Promise<string> {
   try {
-    const r = await $.process.run(['osascript', '-e', 'use framework "AppKit"', '-e', 'use scripting additions',
-      '-e', 'set u to current application\'s NSWorkspace\'s sharedWorkspace()\'s URLForApplicationToOpenURL:(current application\'s NSURL\'s URLWithString:"mailto:")',
-      '-e', 'if u is missing value then return ""',
-      '-e', 'return ((current application\'s NSBundle\'s bundleWithURL:u)\'s bundleIdentifier()) as text'], { cwd: root, timeoutMs: 5000 })
-    const app = r.exitCode === 0 ? r.stdout.trim() : ''
-    if (/^[\w.-]+$/.test(app)) return app
+    const r = await $.process.run(['defaults', 'export', 'com.apple.LaunchServices/com.apple.launchservices.secure', '-'], { cwd: root, timeoutMs: 5000 })
+    const app = r.exitCode === 0 ? mailtoHandler(r.stdout) : null
+    if (app) return app
   } catch {
-    // no answer: the system's choice
+    // no settings to read: the system's choice
   }
   return 'com.apple.mail'
 }
@@ -877,20 +885,13 @@ async function mailDraft($: any, page: string, l: Labels): Promise<string> {
   return say(l.share_mail_attach, { path: page }) + (shown ? '\n' + l.share_file_shown : '')
 }
 
-// The page on the clipboard as a file, to paste into Slack, Teams, a chat or an e-mail. On a Mac
-// only; the path goes to osascript as an argument, never into the script. Elsewhere the page is shown
-// in the file manager, to drag.
-async function toClipboard($: any, page: string, l: Labels): Promise<string> {
-  if (interactive && (await onMac($))) {
-    try {
-      const argv = ['osascript', '-e', 'on run argv', '-e', 'set the clipboard to (POSIX file (item 1 of argv))', '-e', 'end run', page]
-      if ((await $.process.run(argv, { cwd: root, timeoutMs: 15000 })).exitCode === 0) return say(l.share_copied, { path: page })
-    } catch {
-      // no clipboard here: drag the file
-    }
-  }
+// The page for Slack, Teams or a chat: selected in the file manager, to copy and paste (Cmd+C, Cmd+V
+// on a Mac) or to drag. inloop runs no script to reach the clipboard.
+async function toChat($: any, page: string, l: Labels): Promise<string> {
+  const mac = interactive && (await onMac($))
   const shown = await reveal($, page)
-  return say(l.share_copy_failed, { path: page }) + (shown ? '\n' + l.share_file_shown : '')
+  if (mac && shown) return say(l.share_copy_finder, { path: page })
+  return say(l.share_copy_drag, { path: page }) + (shown ? '\n' + l.share_file_shown : '')
 }
 
 // Writes the review as a light page and its Markdown in .inloop/share, then hands the page on
@@ -911,7 +912,7 @@ async function share($: any, to: ShareTo, what: string, theme: Theme, l: Labels)
   await $.fs.write(md, text)
   const trimmed = cut ? '\n' + l.review_trimmed : ''
   if (to === 'mail') return (await mailDraft($, page, l)) + trimmed
-  if (to === 'copy') return (await toClipboard($, page, l)) + trimmed
+  if (to === 'copy') return (await toChat($, page, l)) + trimmed
   const shown = await reveal($, page)
   return say(l.share_file, { path: page, md }) + (shown ? '\n' + l.share_file_shown : '') + trimmed
 }

@@ -20,8 +20,8 @@ The first version.
 - `/inloop review pr [n]`: a pull request, fetched into `refs/inloop/pr-<n>` and reviewed as it
   stands there.
 - `/inloop share`: asks where the review goes. `share mail` opens a new message in your mail app
-  with the page attached and `share copy` puts the page on the clipboard to paste into Slack,
-  Teams or a chat (both on a Mac); `share file` writes the page and its Markdown to
+  with the page attached (on a Mac), `share copy` selects the page in the file manager to paste
+  or drag into Slack, Teams or a chat, and `share file` writes the page and its Markdown to
   `.inloop/share/` and shows them in the file manager.
 - `/inloop status` (or `/inloop` alone) shows each setting with the command that changes it and
   the commands to go on with.

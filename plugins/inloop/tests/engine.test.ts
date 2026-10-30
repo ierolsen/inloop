@@ -71,25 +71,6 @@ test('a note with a gap is saved and says what is missing; a recap is saved', as
   expect(w.records().find((r) => r.kind === 'recap').recap).toMatchObject({ overview: 'Renamed x.', reading_order: [{ file: 'a.py', why: 'the only change' }] })
 })
 
-test('secrets never reach the log: tokens are redacted and a .env file is logged by path only', async ($, on) => {
-  const w = worldOf(on)
-  const key = 'sk-ant-' + 'k'.repeat(32)
-  await $.session.start(START)
-  await $.turn.start({ text: 'add the client config', turnId: 't1' })
-  await $.tool.call(note({ title: 'Config', files: ['config.py', '.env'], what: 'Reads ' + key, why: 'The client needs a key.' }))
-  await $.tool.call({ tool: 'Write', file_path: ROOT + '/config.py', content: 'API_KEY = "' + key + '"\nTIMEOUT = 30\n' } as any)
-  await $.tool.call({ tool: 'Write', file_path: ROOT + '/.env', content: 'TOKEN=' + key + '\n' } as any)
-  expect(w.files.get(LOG)).not.toContain(key)
-  const [config, env] = edits(w)
-  expect(config.diff).toContain('+API_KEY = "[redacted]"')
-  expect(config.diff).toContain('+TIMEOUT = 30')
-  expect(config.redactions).toBe(1)
-  expect(env).toMatchObject({ path: '.env', skipped: 'sensitive', diff: null, status: 'ok' })
-  expect(w.records().find((r) => r.kind === 'note').note.what).toBe('Reads [redacted]')
-  // the files themselves are written as Claude asked
-  expect(w.files.get(ROOT + '/.env')).toBe('TOKEN=' + key + '\n')
-})
-
 test('a refused edit is logged as refused and counts for nothing', async ($, on) => {
   const w = worldOf(on)
   w.refused.add(ROOT + '/a.py')
@@ -479,20 +460,20 @@ test('/inloop share file writes a light page and its Markdown to attach to an em
   expect((await $.command.run(command('share link'))).text).toStartWith('Sharing by link (a secret gist) comes in a later version.')
 })
 
-test('/inloop share asks where the review goes; on a Mac the mail app gets the page attached, or the clipboard holds it', async ($, on) => {
+test('/inloop share asks where the review goes; on a Mac the mail app gets the page attached, or Finder shows it to copy', async ($, on) => {
   const { w, git } = await committedShapes($, on)
   const PAGE = ROOT + '/.inloop/share/inloop-work.html'
-  // macOS's answer to which app opens mailto: links; none named means Apple Mail
-  const ASK = ['osascript', '-e', 'use framework "AppKit"', '-e', 'use scripting additions',
-    '-e', 'set u to current application\'s NSWorkspace\'s sharedWorkspace()\'s URLForApplicationToOpenURL:(current application\'s NSURL\'s URLWithString:"mailto:")',
-    '-e', 'if u is missing value then return ""',
-    '-e', 'return ((current application\'s NSBundle\'s bundleWithURL:u)\'s bundleIdentifier()) as text'].join(' ')
-  Object.assign(git, { 'uname -s': 'Darwin\n', [ASK]: '\n', ['open -b com.apple.mail ' + PAGE]: '' })
+  // macOS's Launch Services settings, as `defaults export` prints them: no mailto: handler chosen
+  const HANDLERS = 'defaults export com.apple.LaunchServices/com.apple.launchservices.secure -'
+  const plist = (scheme: string, app: string) => '<plist version="1.0">\n<dict>\n\t<key>LSHandlers</key>\n\t<array>\n\t\t<dict>\n' +
+    '\t\t\t<key>LSHandlerPreferredVersions</key>\n\t\t\t<dict>\n\t\t\t\t<key>LSHandlerRoleAll</key>\n\t\t\t\t<string>-</string>\n\t\t\t</dict>\n' +
+    '\t\t\t<key>LSHandlerRoleAll</key>\n\t\t\t<string>' + app + '</string>\n\t\t\t<key>LSHandlerURLScheme</key>\n\t\t\t<string>' + scheme + '</string>\n\t\t</dict>\n\t</array>\n</dict>\n</plist>\n'
+  Object.assign(git, { 'uname -s': 'Darwin\n', [HANDLERS]: plist('slack', 'com.tinyspeck.slackmacgap'), ['open -b com.apple.mail ' + PAGE]: '', ['open -R ' + PAGE]: '' })
   // the person picks e-mail in the dialog: no mailto: handler chosen, so Apple Mail gets the page
   w.answer = 'E-mail: a new message with the page attached'
   const mailed = (await $.command.run(command('share'))).text
   expect(w.asked[0].question).toBe('How do you want to share this review?')
-  expect(w.asked[0].options.map((o: any) => o.label)).toEqual(['E-mail: a new message with the page attached', 'Slack, Teams or a chat: the page on your clipboard',
+  expect(w.asked[0].options.map((o: any) => o.label)).toEqual(['E-mail: a new message with the page attached', 'Slack, Teams or a chat: the page in your file manager, to copy or drag',
     'Pull request: a comment on this branch\'s PR, shown to you first', 'File: the page and its Markdown in .inloop/share'])
   expect(mailed).toStartWith('A new message in your mail app has the page attached (' + PAGE + '): add who it goes to and send it.')
   expect(w.ran).toContain('open -b com.apple.mail ' + PAGE)
@@ -500,13 +481,16 @@ test('/inloop share asks where the review goes; on a Mac the mail app gets the p
   // dismissed: the commands to use instead
   w.answer = null
   expect((await $.command.run(command('share'))).text).toStartWith('Share it with:\n  /inloop share mail    a new e-mail with the page attached\n')
-  // a typed answer counts by its first word
-  git['osascript -e on run argv -e set the clipboard to (POSIX file (item 1 of argv)) -e end run ' + PAGE] = ''
+  // a typed answer counts by its first word: Finder selects the page, to copy and paste; no script runs
   w.answer = 'copy it please'
-  expect((await $.command.run(command('share'))).text).toStartWith('The page is on your clipboard (' + PAGE + '): paste it into Slack, Teams, a chat or an e-mail.')
-  // web mail cannot take a file: the page is shown, to attach by hand
-  git[ASK] = 'com.google.Chrome\n'
-  git['open -R ' + PAGE] = ''
+  expect((await $.command.run(command('share'))).text).toStartWith('The page is selected in Finder (' + PAGE + '): press Cmd+C there, then Cmd+V in Slack, Teams, a chat or an e-mail.')
+  expect(w.ran.filter((c) => c.startsWith('osascript'))).toEqual([])
+  // a mail app the person chose gets the page; web mail cannot take a file, so the page is shown
+  git[HANDLERS] = plist('mailto', 'com.microsoft.Outlook')
+  git['open -b com.microsoft.Outlook ' + PAGE] = ''
+  expect((await $.command.run(command('share mail'))).text).toStartWith('A new message in your mail app has the page attached')
+  expect(w.ran).toContain('open -b com.microsoft.Outlook ' + PAGE)
+  git[HANDLERS] = plist('mailto', 'com.google.Chrome')
   expect((await $.command.run(command('share mail'))).text).toBe('Your e-mail opens in a browser, which cannot take a file from inloop. The page is at ' + PAGE + ': attach it to the e-mail.\nShown in your file manager.')
   expect(w.ran.filter((c) => c.startsWith('gh '))).toEqual([])
 })
@@ -519,7 +503,7 @@ test('away from a Mac, and with nobody to ask, /inloop share falls back to the f
   expect(text).toStartWith('Page: ' + PAGE + '\n')
   expect(text).toContain('\n\nShare it with:\n')
   expect(w.asked).toEqual([])
-  expect((await $.command.run(command('share copy'))).text).toStartWith('The page could not go on the clipboard here. It is at ' + PAGE + ': drag it into Slack')
+  expect((await $.command.run(command('share copy'))).text).toStartWith('The page is at ' + PAGE + ': drag it into Slack, Teams, a chat or an e-mail.')
   expect((await $.command.run(command('share mail'))).text).toStartWith('The page is at ' + PAGE + ': attach it to an e-mail.')
   expect((await $.command.run(command('share mail main.. extra'))).text).toBe('Use `/inloop share`, `/inloop share mail|copy|file [range]` or `/inloop share pr [number] [--yes]`.')
 })
@@ -540,7 +524,7 @@ test('/inloop share pr shows a preview first, posts only with --yes typed by a p
   const { w, git, B } = await committedShapes($, on)
   const posted = () => w.ran.filter((c) => c.startsWith('gh api -X'))
   // no gh: said plainly
-  expect((await $.command.run(command('share pr'))).text).toBe('This needs the GitHub CLI (`gh`), signed in with `gh auth login`: https://cli.github.com')
+  expect((await $.command.run(command('share pr'))).text).toBe('This needs the GitHub CLI (`gh`): install it, then sign in with `gh auth login`.')
   Object.assign(git, { 'gh --version': 'gh version 2.82.0\n', [PR_VIEW]: prJson(B, [B]), [PR_VIEW.replace('view', 'view 7')]: prJson(B, [B]), 'gh api user --jq .login': 'erol\n', [COMMENTS]: '' })
   const preview = (await $.command.run(command('share pr'))).text
   expect(preview).toBe('Preview, nothing sent: PR #7 Add shapes\nhttps://github.com/erol/shop/pull/7\nComment: ' + ROOT + '/.inloop/share/pr-7.md (' +

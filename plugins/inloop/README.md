@@ -55,11 +55,12 @@ Claude Code's plugin store.
 | `gh` (`--version`, `pr view`, `api`) | `/inloop review pr`, `/inloop share pr` | To read the pull request and inloop's earlier comment on it; with `--yes`, to post or update that comment |
 | `uname -s` | Before opening a page | To tell a Mac from Linux |
 | `open`, `xdg-open`, `cmd /c start`, `explorer` | `/inloop review`, `explain`, `share` | To show a page in your browser, or a file in your file manager |
-| `osascript` | `/inloop share mail` and `share copy`, on a Mac | To ask macOS which app opens `mailto:` links, and to put the page on the clipboard |
+| `defaults export com.apple.LaunchServices/com.apple.launchservices.secure -` | `/inloop share mail`, on a Mac | To read which app you chose for `mailto:` links (Apple Mail when none) |
 | `open -b <mail app> <page>` | `/inloop share mail`, on a Mac | To start a new message in your mail app with the page attached |
 
 The file names and arguments in these commands come from your project, which is why they are not
-fixed text in the code. `git` and `gh` run with their password prompts turned off.
+fixed text in the code. inloop runs no shell, no script interpreter and no downloader, and `git`
+and `gh` run with their password prompts turned off.
 
 ### What leaves your computer
 
@@ -69,8 +70,8 @@ Nothing, unless you ask for it:
   `gh` and `git`.
 - `/inloop share pr --yes`, typed by you at Claude Code's prompt, posts the review as a comment
   on your pull request, through your own `gh` login.
-- `/inloop share mail` and `share copy` only hand the page to your mail app or your clipboard;
-  you choose who gets it and send it.
+- `/inloop share mail` and `share copy` only hand the page to your mail app or show it in your
+  file manager; you choose who gets it and send it.
 
 inloop reads no credentials and no environment variables; `gh` and `git` use their own logins.
 It sends nothing from the conversation anywhere: it reads Claude's tool calls to record what
