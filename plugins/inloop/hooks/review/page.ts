@@ -122,7 +122,9 @@ function notesHtml(g: Group, l: Labels): string {
     if (n.what) out.push('<dt>' + esc(l.page_what) + '</dt><dd class="rich">' + rich(n.what) + '</dd>')
     if (n.why) out.push('<dt>' + esc(l.page_why) + '</dt><dd class="why rich">' + rich(n.why) + basis + tags + '</dd>')
     if (n.alternatives.length) out.push('<dt>' + esc(l.r_instead) + '</dt><dd class="rich"><ul>' + n.alternatives.map((a) => '<li>' + span(a) + '</li>').join('') + '</ul></dd>')
+    if (n.impact.length) out.push('<dt>' + esc(l.r_impact) + '</dt><dd class="rich"><ul>' + n.impact.map((a) => '<li>' + span(a) + '</li>').join('') + '</ul></dd>')
     if (n.risks.length) out.push('<dt>' + esc(l.page_risks) + '</dt><dd class="risk rich"><ul>' + n.risks.map((a) => '<li>' + span(a) + '</li>').join('') + '</ul></dd>')
+    if (n.terms.length) out.push('<dt>' + esc(l.r_terms) + '</dt><dd><dl class="terms">' + n.terms.map((t) => '<dt>' + esc(t.term) + '</dt><dd class="rich">' + rich(t.means) + '</dd>').join('') + '</dl></dd>')
     out.push('</dl>')
     const missed = g.missed.filter((m) => m.note === ref.id)
     if (missed.length) {

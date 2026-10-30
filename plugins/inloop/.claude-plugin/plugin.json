@@ -25,21 +25,23 @@
       "description": "The language of inloop's notes and review page, as a name or a code (English, Türkçe, Deutsch, Nederlands, tr, de, nl ...). It does not depend on the language you chat in.",
       "default": "English"
     },
-    "detail": {
+    "level": {
       "type": "string",
-      "title": "Detail",
-      "description": "How much the notes explain. brief: what and why. standard: also the parameters that are not obvious, comments on the lines a reader would stop at, and why each new class or function exists. deep: also every parameter, comments on most changed lines, and links to official documentation.",
+      "title": "Level",
+      "description": "How the notes explain. full: nearly every line and every term, for someone new to the code. guided: the lines that carry the logic and the patterns behind them. essentials: what and why, only what is not obvious. design: decisions, trade-offs and impact on other parts. big-picture: architecture and long-term risks, no line detail.",
       "options": [
-        "brief",
-        "standard",
-        "deep"
+        "full",
+        "guided",
+        "essentials",
+        "design",
+        "big-picture"
       ],
-      "default": "standard"
+      "default": "guided"
     },
     "adhd": {
       "type": "string",
       "title": "ADHD-friendly notes",
-      "description": "on: notes put the point first, use short lines and bold key words, and explain every term, symbol and parameter in plain words with an example from the code. It changes how notes are written, not how much they explain.",
+      "description": "on: notes put the point first, use short lines and bold key words, and explain every term, symbol and parameter with an example from the code, keeping technical terms as developers say them. It changes how notes are written, not how much they explain.",
       "options": [
         "off",
         "on"

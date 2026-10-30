@@ -1,6 +1,6 @@
 // Unit tests of inloop's plain modules: no events, no mods API.
 import { expect, test } from 'claude-code/testing'
-import { language, resolve, detail, languageName, fold } from '../hooks/config.ts'
+import { language, resolve, level, languageName, fold } from '../hooks/config.ts'
 import { instructions } from '../hooks/instructions.ts'
 import { cleanNote, cleanRecap, relative, inside, sameFile, Pairing } from '../hooks/note.ts'
 import { diff, lines, isBinary } from '../hooks/diff.ts'
@@ -21,28 +21,33 @@ test('a language is found by code, English name, native name or another spelling
 })
 
 test('settings come from the project, then the user, then the plugin, then the default', async () => {
-  expect(resolve({})).toEqual({ language: { code: 'en', english: 'English', native: 'English', source: 'default' }, detail: { value: 'standard', source: 'default' }, adhd: { value: false, source: 'default' } })
+  expect(resolve({})).toEqual({ language: { code: 'en', english: 'English', native: 'English', source: 'default' }, level: { value: 'guided', source: 'default' }, adhd: { value: false, source: 'default' } })
   expect(resolve({ project: { adhd: 'on' }, user: { adhd: false } }).adhd).toEqual({ value: true, source: 'project' })
   expect(resolve({ user: { adhd: false }, plugin: { adhd: 'on' } }).adhd).toEqual({ value: false, source: 'user' })
-  const s = resolve({ project: { detail: 'deep' }, user: { language: 'tr', detail: 'brief' }, plugin: { language: 'German', detail: 'standard' } })
+  // a layer may still hold the first builds' "detail"; "level" wins where both are set
+  const s = resolve({ project: { detail: 'deep' }, user: { language: 'tr', level: 'design', detail: 'brief' }, plugin: { language: 'German', level: 'guided' } })
   expect(s.language.code).toBe('tr')
   expect(s.language.source).toBe('user')
-  expect(s.detail).toEqual({ value: 'deep', source: 'project' })
+  expect(s.level).toEqual({ value: 'full', source: 'project' })
+  expect(resolve({ user: { level: 'design', detail: 'brief' } }).level).toEqual({ value: 'design', source: 'user' })
   expect(resolve({ project: { language: 'nl' }, user: { language: 'tr' } }).language.source).toBe('project')
-  expect(resolve({ plugin: { language: '', detail: 'loud' } })).toEqual(resolve({}))
-  expect(detail('DEEP')).toBe('deep')
+  expect(resolve({ plugin: { language: '', level: 'loud' } })).toEqual(resolve({}))
+  expect(['FULL', 'big picture', 'Big-Picture', 'standard', 'brief', 'deep', 'key points'].map(level)).toEqual(['full', 'big-picture', 'big-picture', 'guided', 'essentials', 'full', 'essentials'])
+  expect(level('loud')).toBe(null)
   expect(languageName(language('tr')!)).toBe('Turkish (Türkçe)')
   expect(languageName(language('en')!)).toBe('English')
 })
 
-test('the instructions name the language and the detail rule, and depend only on them', async () => {
-  const tr = instructions('inloop', language('tr')!, 'deep')
+test('the instructions name the language, the level and the terminology rule, and depend only on them', async () => {
+  const tr = instructions('inloop', language('tr')!, 'full')
   expect(tr).toContain('mcp__inloop__note')
   expect(tr).toContain('mcp__inloop__recap')
   expect(tr).toContain('Turkish (Türkçe)')
-  expect(tr).toContain('never guess a URL')
-  expect(instructions('inloop', language('tr')!, 'deep')).toBe(tr)
-  expect(instructions('inloop', language('de')!, 'brief')).toContain('one sentence each')
+  expect(instructions('inloop', language('tr')!, 'full')).toBe(tr)
+  expect(tr).toContain('Never translate a technical term word for word')
+  expect(tr).toContain('Add to `terms` every technical term')
+  expect(instructions('inloop', language('de')!, 'big-picture')).toContain('leave `lines`, `parameters` and `terms` empty')
+  expect(instructions('inloop', language('de')!, 'design')).toContain('fill `impact`')
   expect(tr).not.toContain('\u2014')
 })
 

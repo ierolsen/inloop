@@ -18,7 +18,7 @@ test('a session writes nothing until it records something; then .inloop/ keeps i
   await $.tool.call(note({ title: 'First', files: ['a.py'], what: 'w', why: 'y' }))
   expect(w.files.get(ROOT + '/.inloop/.gitignore')).toBe('*\n')
   expect(w.records().map((r) => r.kind)).toEqual(['session', 'baseline', 'note'])
-  expect(w.records()[0]).toMatchObject({ v: 1, session: SESSION_ID, root: ROOT, language: 'English', language_code: 'en', detail: 'standard', version: '0.1.0' })
+  expect(w.records()[0]).toMatchObject({ v: 1, session: SESSION_ID, root: ROOT, language: 'English', language_code: 'en', level: 'guided', version: '0.1.0' })
   expect(w.records()[1]).toMatchObject({ git: false, head: null, dirty: [] })
 })
 
@@ -99,7 +99,7 @@ test('a refused edit is logged as refused and counts for nothing', async ($, on)
   expect((await $.turn.complete(turnDone('t1'))).text).toBe('Done.')
 })
 
-test('/inloop lang and detail change the next instructions, for all projects or for this one', async ($, on) => {
+test('/inloop lang and level change the next instructions, for all projects or for this one', async ($, on) => {
   const w = worldOf(on)
   await $.session.start(START)
   const written = async () => (await $.prompt.compose(COMPOSE as any)).sections.find((s) => s.id === 'inloop:instructions')?.text ?? ''
@@ -126,12 +126,14 @@ test('/inloop lang and detail change the next instructions, for all projects or 
   expect(await written()).toContain('Japanese (日本語)')
   await $.command.run(command('lang reset'))
 
-  expect(await written()).not.toContain('never guess a URL')
-  expect((await $.command.run(command('detail deep'))).text).toBe('From now on inloop notes are deep, in all your projects.')
-  expect(await written()).toContain('never guess a URL')
-  expect((await $.command.run(command('detail loud'))).text).toBe('Detail is brief, standard or deep.')
-  expect((await $.command.run(command('status'))).text).toContain('Notes are in English (the plugin setting), detail deep (your setting for all projects), ADHD-friendly off (the plugin setting).')
-  expect((await $.command.run(command('detail reset'))).text).toBe('inloop notes are standard again (the plugin setting).')
+  expect(await written()).toContain('Level "guided"')
+  expect((await $.command.run(command('level full'))).text).toBe('From now on inloop notes explain at the level "full explanation", in all your projects.')
+  expect(await written()).toContain('Level "full explanation"')
+  expect((await $.command.run(command('level loud'))).text).toBe('The levels are full, guided, essentials, design and big-picture.')
+  expect((await $.command.run(command('status'))).text).toContain('Notes are in English (the plugin setting), level full explanation (your setting for all projects), ADHD-friendly off (the plugin setting).')
+  // the first builds' command and values still work
+  expect((await $.command.run(command('detail brief'))).text).toBe('From now on inloop notes explain at the level "key points", in all your projects.')
+  expect((await $.command.run(command('level reset'))).text).toBe('inloop notes explain at the level "guided" again (the plugin setting).')
   expect((await $.command.run(command('fly'))).text).toStartWith('inloop has no command "fly".\ninloop commands:')
 })
 
@@ -256,8 +258,8 @@ test('files outside the project and inloop\'s own files are not recorded as edit
 test('a project setting writes .inloop/ with its .gitignore', async ($, on) => {
   const w = worldOf(on)
   await $.session.start(START)
-  await $.command.run(command('detail deep --project'))
-  expect(JSON.parse(w.files.get(ROOT + '/.inloop/config.json') ?? '{}')).toEqual({ detail: 'deep' })
+  await $.command.run(command('level design --project'))
+  expect(JSON.parse(w.files.get(ROOT + '/.inloop/config.json') ?? '{}')).toEqual({ level: 'design' })
   expect(w.files.get(ROOT + '/.inloop/.gitignore')).toBe('*\n')
   expect(w.files.has(LOG)).toBe(false)
 })
@@ -270,8 +272,8 @@ test('/inloop adhd changes how the next notes are written, not how much they say
   expect((await $.command.run(command('adhd on'))).text).toStartWith('From now on inloop notes are written for easy reading, in all your projects')
   const rules = await written()
   expect(rules).toContain('How to write for this user')
-  expect(rules).toContain('Explain every term, abbreviation, symbol and formula')
-  expect(rules).toContain('Add `lines` comments for the lines a reader would stop at') // the detail level is unchanged
+  expect(rules).toContain('Keep every technical term as developers say it, and explain it')
+  expect(rules).toContain('Level "guided"') // the level is unchanged
   expect((await $.command.run(command('adhd off --project'))).text).toBe('From now on inloop notes are written in the usual form, in this project.')
   expect(JSON.parse(w.files.get(ROOT + '/.inloop/config.json') ?? '{}')).toEqual({ adhd: 'off' })
   expect(await written()).not.toContain('How to write for this user')

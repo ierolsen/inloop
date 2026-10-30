@@ -1,8 +1,11 @@
-// Settings: which language inloop's notes and page are in, how much detail the notes carry, and
+// Settings: which language inloop's notes and page are in, which level they explain at, and
 // whether they are written in the ADHD-friendly form.
 // Plain module: no mods API calls here (see CLAUDE.md).
 
-export type Detail = 'brief' | 'standard' | 'deep'
+// From explaining every line to a reader new to the code, to the architecture for one who looks at
+// the whole system. Named for the kind of explanation, not for the reader's job title.
+export type Level = 'full' | 'guided' | 'essentials' | 'design' | 'big-picture'
+export const LEVELS: Level[] = ['full', 'guided', 'essentials', 'design', 'big-picture']
 export type Source = 'project' | 'user' | 'plugin' | 'default'
 
 export type Language = {
@@ -15,7 +18,7 @@ export type Language = {
 
 export type Settings = {
   language: Language & { source: Source }
-  detail: { value: Detail; source: Source }
+  level: { value: Level; source: Source }
   adhd: { value: boolean; source: Source }
 }
 
@@ -53,7 +56,8 @@ const LANGUAGES: [string, string, string, string[]][] = [
   ['zh', 'Chinese', '中文', ['zho', 'chi', 'cince', 'chinesisch', 'chinees', 'mandarin']],
 ]
 
-const DETAILS: Detail[] = ['brief', 'standard', 'deep']
+// The detail values of the first builds, and other ways people type a level
+const ALIASES: Record<string, Level> = { brief: 'essentials', standard: 'guided', deep: 'full', bigpicture: 'big-picture', big: 'big-picture', architecture: 'big-picture', key: 'essentials', keypoints: 'essentials' }
 
 // "Türkçe" -> "turkce": lower case, accents and separators removed, so any spelling matches
 export function fold(text: string): string {
@@ -84,9 +88,10 @@ export function adhd(input: unknown): boolean | null {
   return null
 }
 
-export function detail(input: unknown): Detail | null {
-  const text = typeof input === 'string' ? input.trim().toLowerCase() : ''
-  return (DETAILS as string[]).includes(text) ? (text as Detail) : null
+export function level(input: unknown): Level | null {
+  const text = typeof input === 'string' ? input.trim().toLowerCase().replace(/[\s_]+/g, '-') : ''
+  if ((LEVELS as string[]).includes(text)) return text as Level
+  return ALIASES[text.replace(/-/g, '')] ?? null
 }
 
 // The settings in effect, from the first layer that sets each one: the project's override, the
@@ -98,17 +103,18 @@ export function resolve(layers: { project?: Record<string, unknown>; user?: Reco
     const value = layer && typeof layer.language === 'string' ? language(layer.language) : null
     if (value) { lang = { ...value, source }; break }
   }
-  let level: Settings['detail'] = { value: 'standard', source: 'default' }
+  // a layer may still hold the old "detail" key; "level" wins where both are set
+  let depth: Settings['level'] = { value: 'guided', source: 'default' }
   for (const [source, layer] of order) {
-    const value = layer ? detail(layer.detail) : null
-    if (value) { level = { value, source }; break }
+    const value = layer ? level(layer.level) ?? level(layer.detail) : null
+    if (value) { depth = { value, source }; break }
   }
   let easy: Settings['adhd'] = { value: false, source: 'default' }
   for (const [source, layer] of order) {
     const value = layer ? adhd(layer.adhd) : null
     if (value !== null) { easy = { value, source }; break }
   }
-  return { language: lang, detail: level, adhd: easy }
+  return { language: lang, level: depth, adhd: easy }
 }
 
 // How the language reads in the instructions: "Turkish (Türkçe)", or the name as given

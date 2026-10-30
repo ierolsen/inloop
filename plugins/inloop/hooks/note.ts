@@ -8,6 +8,8 @@ export type Symbol = { name: string; kind: SymbolKind; file: string | null; why_
 export type Use = { name: string; from: string; why: string; doc_url: string | null }
 // A comment on one line of the new code, found again by a piece of that line's text
 export type LineNote = { anchor: string; says: string }
+// A technical term kept as developers say it, with what it means
+export type Term = { term: string; means: string }
 
 export type Note = {
   title: string
@@ -21,6 +23,8 @@ export type Note = {
   parameters: Parameter[]
   symbols: Symbol[]
   lines: LineNote[]
+  terms: Term[]
+  impact: string[]
   risks: string[]
   commit: string | null // the commit a reconstructed note explains
 }
@@ -92,6 +96,8 @@ export function cleanNote(input: Record<string, unknown>): { note: Note; problem
       called_by: opt(s.called_by),
     })),
     lines: arr(input.lines).map(obj).filter((x) => str(x.anchor) && str(x.says)).map((x) => ({ anchor: str(x.anchor, 300), says: str(x.says) })),
+    terms: arr(input.terms).map(obj).filter((x) => str(x.term) && str(x.means)).map((x) => ({ term: str(x.term, 200), means: str(x.means) })),
+    impact: strings(input.impact),
     risks: strings(input.risks),
     commit: /^[0-9a-f]{4,40}$/i.test(str(input.commit, 40)) ? str(input.commit, 40).toLowerCase() : null,
   }

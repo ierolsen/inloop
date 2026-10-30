@@ -16,7 +16,7 @@ type Base = { v: number; ts: number; session: string; agent: string | null; turn
 
 export type Skipped = 'binary' | 'too-large' | 'sensitive' | 'unreadable' | 'unchanged'
 
-export type SessionRecord = Base & { kind: 'session'; root: string; language: string; language_code: string | null; detail: string; adhd?: boolean; version: string }
+export type SessionRecord = Base & { kind: 'session'; root: string; language: string; language_code: string | null; level?: string; detail?: string; adhd?: boolean; version: string }
 export type NoteRecord = Base & { kind: 'note'; id: string; n: number; source: 'live' | 'reconstructed'; note: Note; problems: string[] }
 export type RecapRecord = Base & { kind: 'recap'; id: string; recap: Recap }
 export type EditRecord = Base & {

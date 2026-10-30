@@ -90,6 +90,9 @@ ul.check input { margin-top: 5px; accent-color: var(--accent); flex: none; }
 .badge { font-size: 12px; border-radius: 999px; padding: 1px 8px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; display: inline-block; vertical-align: 1px; }
 .badge.new { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
 .badge.warn { border-color: transparent; background: var(--warn); color: var(--warn-ink); }
+dl.terms { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 15px; }
+dl.terms dt { font-weight: 650; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13.5px; padding-top: 2px; }
+dl.terms dd { margin: 0; min-width: 0; }
 .missed { margin-top: 12px; font-size: 15px; }
 .missed ul { margin: 6px 0 0; padding-left: 20px; }
 .missed li .head { display: flex; gap: 8px; align-items: baseline; }

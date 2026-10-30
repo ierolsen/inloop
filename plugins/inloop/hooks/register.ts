@@ -1,7 +1,7 @@
 // inloop's hooks module: the only file that calls the mods API. Every other module under hooks/ is
 // plain code that takes values and returns values (see CLAUDE.md).
 
-import { resolve, language as parseLanguage, detail as parseDetail, adhd as parseAdhd, languageName, type Settings } from './config.ts'
+import { resolve, language as parseLanguage, level as parseLevel, adhd as parseAdhd, languageName, type Settings } from './config.ts'
 import { instructions, NOTE_SPEC, RECAP_SPEC } from './instructions.ts'
 import { cleanNote, cleanRecap, relative, inside, sameFile, Pairing } from './note.ts'
 import { diff, isBinary } from './diff.ts'
@@ -192,22 +192,24 @@ async function readUser($: any): Promise<Record<string, unknown>> {
 
 async function loadSettings($: any) {
   settings = resolve({ project: await readProject($), user: await readUser($), plugin: options })
-  prompt = instructions(PLUGIN, settings.language, settings.detail.value, settings.adhd.value)
+  prompt = instructions(PLUGIN, settings.language, settings.level.value, settings.adhd.value)
 }
 
 // Sets (or, with null, removes) one setting for this project or across projects, then reloads them.
-async function setSetting($: any, key: 'language' | 'detail' | 'adhd', value: string | null, project: boolean) {
+// The level replaced the first builds' "detail": setting or clearing the level clears that too.
+async function setSetting($: any, key: 'language' | 'level' | 'adhd', value: string | null, project: boolean) {
+  const keys = key === 'level' ? ['level', 'detail'] : [key]
   if (project) {
     const current = await readProject($)
-    if (value === null && !(key in current)) return loadSettings($)
-    if (value === null) delete current[key]
-    else current[key] = value
+    if (value === null && !keys.some((k) => k in current)) return loadSettings($)
+    for (const k of keys) delete current[k]
+    if (value !== null) current[key] = value
     await keepOutOfGit($)
     await $.fs.write(root + '/' + CONFIG, JSON.stringify(current, null, 2) + '\n')
   } else {
     const current = await readUser($)
-    if (value === null) delete current[key]
-    else current[key] = value
+    for (const k of keys) delete current[k]
+    if (value !== null) current[key] = value
     await $.store.set('settings', current)
   }
   await loadSettings($)
@@ -373,14 +375,14 @@ async function start($: any) {
   if (!continued) {
     await append($, {
       v: SCHEMA, kind: 'session', ts: now(), session, agent: null, turn: null, root,
-      language: languageName(settings.language), language_code: settings.language.code, detail: settings.detail.value, adhd: settings.adhd.value, version: VERSION,
+      language: languageName(settings.language), language_code: settings.language.code, level: settings.level.value, adhd: settings.adhd.value, version: VERSION,
     })
   }
   await takeBaseline($)
   ready = true
 }
 
-const detailName = (l: Labels, value: string) => l[('detail_' + value) as 'detail_brief'] ?? value
+const levelName = (l: Labels, value: string) => l[('level_' + value.replace('-', '_')) as 'level_full'] ?? value
 const sourceName = (l: Labels, source: string) => l[('source_' + source) as 'source_user']
 
 // ---- the review -------------------------------------------------------------------------------
@@ -574,7 +576,7 @@ function statusText(): string {
   return say(l.status, {
     state: enabled ? l.state_on : l.state_off,
     language: nameOf(settings.language, code), language_source: sourceName(l, settings.language.source),
-    detail: detailName(l, settings.detail.value), detail_source: sourceName(l, settings.detail.source),
+    level: levelName(l, settings.level.value), level_source: sourceName(l, settings.level.source),
     adhd: settings.adhd.value ? l.state_on : l.state_off, adhd_source: sourceName(l, settings.adhd.source),
     notes: count(code, l.notes, tally.notes), edits: count(code, l.edits, tally.edits),
     unexplained: tally.unexplained, files: count(code, l.files, tally.outside),
@@ -595,7 +597,7 @@ export function register(on: any, pluginOptions: any) {
       await $.command.register({
         name: PLUGIN,
         description: 'inloop: the review of Claude\'s work, the language and form of notes, on and off',
-        argumentHint: '[review [range | all] [--theme light|dark] | status | lang <language> | detail <level> | adhd on|off | on | off | help]',
+        argumentHint: '[review [range | all] [--theme light|dark] | status | lang <language> | level <level> | adhd on|off | on | off | help]',
         immediate: true,
       })
     } catch (err) {
@@ -774,17 +776,18 @@ export function register(on: any, pluginOptions: any) {
       if (!hasLabels(lang.code)) said.push(say(after.lang_no_labels, { language: nameOf(lang, ui) }))
       return { text: said.join('\n') }
     }
-    if (command === 'detail') {
+    // "detail" is the first builds' name for the level and still works
+    if (command === 'level' || command === 'detail') {
       if (value === 'reset') {
-        if (!project) await setSetting($, 'detail', null, false)
-        await setSetting($, 'detail', null, true)
-        return { text: say(l.detail_reset, { detail: detailName(l, settings.detail.value), source: sourceName(l, settings.detail.source) }) }
+        if (!project) await setSetting($, 'level', null, false)
+        await setSetting($, 'level', null, true)
+        return { text: say(l.level_reset, { level: levelName(l, settings.level.value), source: sourceName(l, settings.level.source) }) }
       }
-      const level = parseDetail(value)
-      if (!level) return { text: l.detail_bad }
-      await setSetting($, 'detail', level, project)
-      const said = [say(project ? l.detail_project : l.detail_user, { detail: detailName(l, level) })]
-      if (!project && settings.detail.source === 'project') said.push(say(l.detail_project_wins, { detail: detailName(l, settings.detail.value) }))
+      const level = parseLevel(value)
+      if (!level) return { text: l.level_bad }
+      await setSetting($, 'level', level, project)
+      const said = [say(project ? l.level_project : l.level_user, { level: levelName(l, level) })]
+      if (!project && settings.level.source === 'project') said.push(say(l.level_project_wins, { level: levelName(l, settings.level.value) }))
       return { text: said.join('\n') }
     }
     if (command === 'adhd') {

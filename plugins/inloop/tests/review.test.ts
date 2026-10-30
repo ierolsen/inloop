@@ -121,7 +121,7 @@ const noteRec = (id: string, fields: Record<string, unknown>, source = 'live') =
 const editRec = (id: string, path: string, note: string) => rec('edit', { id, tool: 'Write', path, note, listed: true, status: 'ok', created: true, diff: null, added: 1, removed: 0, truncated: false, skipped: null, redactions: 0 })
 const RECORDS = [
   rec('session', { root: '/work/shop', language: 'Turkish', language_code: 'tr', detail: 'standard', version: '0.1.0' }),
-  noteRec('n1', { title: 'Shapes', files: ['shapes.py'], symbols: [{ name: 'Rectangle', kind: 'class', file: 'shapes.py', why_exists: 'holds sizes' }], lines: [{ anchor: 'def largest', says: 'picks the **biggest**' }] }),
+  noteRec('n1', { title: 'Shapes', files: ['shapes.py'], symbols: [{ name: 'Rectangle', kind: 'class', file: 'shapes.py', why_exists: 'holds sizes' }], lines: [{ anchor: 'def largest', says: 'picks the **biggest**' }], terms: [{ term: 'random seed', means: 'the start of a random sequence' }], impact: ['app.py relies on largest()'] }),
   editRec('w1', 'shapes.py', 'n1'),
   rec('commit', { sha: 'b2b2b2b2', parents: ['a1a1a1a1'], subject: 'feat: add shapes', files: ['shapes.py'], edits: ['w1'], notes: ['n1'] }),
   noteRec('n2', { title: 'Use it', files: ['app.py'], uses: [{ name: 'largest', from: 'shapes.py', why: 'to pick the biggest' }] }),
@@ -168,8 +168,8 @@ test('the page puts each explanation beside its line, in the reader\'s language,
   expect(html).toContain("default-src 'none'")
   expect(html.split('<script>').length).toBe(3) // the theme boot and the page's script, nothing else
   expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
-  for (const word of ['İnceleme: Claude neyi değiştirdi, neden', 'Commit 1 / 4', 'Henüz commitlenmedi', 'Sonradan açıklanan kod', 'Sınıf ve fonksiyon dizini', 'Otomatik', 'PDF olarak kaydet',
-    'kaynak: shapes.py', 'picks the <strong>biggest</strong>', 'Bu commit için inloop notu yok', '<code>/inloop:explain f6f6f6f</code>', 'içerik kaydedilmedi', '1 gizli değer saklandı', 'Elle kontrol edilecekler', 'Added <strong>shapes</strong>.']) {
+  for (const word of ['Review: Claude neyi değiştirdi, neden', 'Commit 1 / 4', 'Henüz commitlenmedi', 'Sonradan açıklanan kod', 'Sınıf ve fonksiyon dizini', 'Otomatik', 'PDF olarak kaydet',
+    'kaynak: shapes.py', 'picks the <strong>biggest</strong>', 'Bu commit için inloop notu yok', '<code>/inloop:explain f6f6f6f</code>', 'içerik kaydedilmedi', '1 gizli değer saklandı', 'Elle kontrol edilecekler', 'Added <strong>shapes</strong>.', 'Terimler', '<dt>random seed</dt>', 'Etkisi', 'app.py relies on largest()']) {
     expect(html, word).toContain(word)
   }
   // the numbered pin beside the code, the code highlighted, and the name linked from another file
